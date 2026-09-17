@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import desktopHero from '../assets/hero-vjec-desktop.png';
 import mobileHero from '../assets/hero-vjec-mobile.png';
 import standingAdventurer from '../assets/vyora-adventurer-standing.png';
+import ProgramPage from './ProgramPage.jsx';
 
 const navigation = [
-  { label: 'Home', href: '/', current: true },
+  { label: 'Home', href: '/' },
   { label: 'Program', href: '/program' },
   { label: 'Tracks', href: '/tracks' },
   { label: 'People', href: '/people' },
@@ -34,7 +35,7 @@ function WindowChrome() {
   );
 }
 
-function Navbar() {
+function Navbar({ activePath }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -53,8 +54,8 @@ function Navbar() {
         <span>VYORA<span className="brand-apostrophe">'</span>26</span>
       </a>
       <nav className="desktop-nav" aria-label="Main navigation">
-        {navigation.map(({ label, href, current }) => (
-          <a key={label} href={href} className={current ? 'active' : undefined} aria-current={current ? 'page' : undefined}>{label}</a>
+        {navigation.map(({ label, href }) => (
+          <a key={label} href={href} className={activePath === href ? 'active' : undefined} aria-current={activePath === href ? 'page' : undefined}>{label}</a>
         ))}
       </nav>
       <span className="header-motto" aria-hidden="true"><span>────→</span> A BRIGHTER TOMORROW</span>
@@ -70,8 +71,8 @@ function Navbar() {
       </button>
       <nav id="mobile-navigation" className={`mobile-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Mobile navigation" inert={!menuOpen}>
         <span className="mobile-nav-heading">// SELECT DESTINATION</span>
-        {navigation.map(({ label, href, current }, index) => (
-          <a key={label} href={href} className={current ? 'active' : undefined} aria-current={current ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
+        {navigation.map(({ label, href }, index) => (
+          <a key={label} href={href} className={activePath === href ? 'active' : undefined} aria-current={activePath === href ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
             <span className="nav-index">0{index + 1}</span>{label}<span className="nav-arrow">→</span>
           </a>
         ))}
@@ -154,12 +155,19 @@ function HomeHero() {
 }
 
 export default function App() {
+  const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
+  const isProgram = activePath === '/program';
+
+  useEffect(() => {
+    document.title = isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
+  }, [isProgram]);
+
   return (
     <div className="desktop-surround">
       <div className="app-shell">
         <WindowChrome />
-        <Navbar />
-        <HomeHero />
+        <Navbar activePath={activePath} />
+        {isProgram ? <ProgramPage /> : <HomeHero />}
       </div>
     </div>
   );

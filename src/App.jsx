@@ -3,6 +3,7 @@ import desktopHero from '../assets/hero-vjec-desktop.png';
 import mobileHero from '../assets/hero-vjec-mobile.png';
 import standingAdventurer from '../assets/vyora-adventurer-standing.png';
 import ProgramPage from './ProgramPage.jsx';
+import TracksPage from './TracksPage.jsx';
 
 const navigation = [
   { label: 'Home', href: '/' },
@@ -157,17 +158,18 @@ function HomeHero() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isProgram = activePath === '/program';
+  const isTracks = activePath === '/tracks';
 
   useEffect(() => {
-    document.title = isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
-  }, [isProgram]);
+    document.title = isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
+  }, [isProgram, isTracks]);
 
   return (
     <div className="desktop-surround">
       <div className="app-shell">
         <WindowChrome />
         <Navbar activePath={activePath} />
-        {isProgram ? <ProgramPage /> : <HomeHero />}
+        {isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
       </div>
     </div>
   );

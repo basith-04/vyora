@@ -5,6 +5,8 @@ import standingAdventurer from '../assets/vyora-adventurer-standing.png';
 import ProgramPage from './ProgramPage.jsx';
 import TracksPage from './TracksPage.jsx';
 import FieldPage from './FieldPage.jsx';
+import RegisterPage from './RegisterPage.jsx';
+import PeoplePage from './PeoplePage.jsx';
 
 const navigation = [
   { label: 'Home', href: '/' },
@@ -161,17 +163,19 @@ export default function App() {
   const isProgram = activePath === '/program';
   const isTracks = activePath === '/tracks';
   const isField = activePath === '/field';
+  const isRegister = activePath === '/register';
+  const isPeople = activePath === '/people';
 
   useEffect(() => {
-    document.title = isField ? "FIELD MISSION — VYORA '26" : isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
-  }, [isProgram, isTracks, isField]);
+    document.title = isPeople ? "PEOPLE.EXE — VYORA '26" : isRegister ? "REGISTER.EXE — VYORA '26" : isField ? "FIELD MISSION — VYORA '26" : isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
+  }, [isProgram, isTracks, isField, isRegister, isPeople]);
 
   return (
     <div className="desktop-surround">
       <div className="app-shell">
         <WindowChrome />
         <Navbar activePath={activePath} />
-        {isField ? <FieldPage /> : isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
+        {isPeople ? <PeoplePage /> : isRegister ? <RegisterPage /> : isField ? <FieldPage /> : isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
       </div>
     </div>
   );

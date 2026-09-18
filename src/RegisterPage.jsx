@@ -53,8 +53,6 @@ function EventFacts() {
 
 export default function RegisterPage() {
   const [selectedTier, setSelectedTier] = useState('ieee');
-  const [showLinkMessage, setShowLinkMessage] = useState(false);
-  const registrationUrl = import.meta.env.VITE_REGISTRATION_URL?.trim();
   const ctaContent = <>INITIALIZE REGISTRATION <span aria-hidden="true">→</span></>;
 
   return <main className="register-page" id="main-content">
@@ -66,8 +64,8 @@ export default function RegisterPage() {
     <div className="register-heading"><p>// REGISTER.EXE — INITIALIZATION</p><h1>READY TO BEGIN?</h1><p>SELECT YOUR REGISTRATION TIER AND INITIALIZE.</p></div>
     <aside className="register-annotation">SAME MINDS.<br />MORE POSSIBILITIES.<br />A BRIGHTER TOMORROW.</aside>
     <p className="register-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</p>
-    <div className="register-content"><section className="register-tiers" aria-label="Registration tiers">{tiers.map((tier) => <RegistrationTier key={tier.id} tier={tier} selected={selectedTier === tier.id} onSelect={() => { setSelectedTier(tier.id); setShowLinkMessage(false); }} />)}</section><EventFacts /></div>
-    <div className="register-action">{registrationUrl ? <a className="register-action-button" href={registrationUrl}>{ctaContent}</a> : <button className="register-action-button" type="button" onClick={() => setShowLinkMessage(true)}>{ctaContent}</button>}{showLinkMessage && <p className="register-link-message" role="status">REGISTRATION LINK NOT YET CONFIGURED.</p>}</div>
+    <div className="register-content"><section className="register-tiers" aria-label="Registration tiers">{tiers.map((tier) => <RegistrationTier key={tier.id} tier={tier} selected={selectedTier === tier.id} onSelect={() => setSelectedTier(tier.id)} />)}</section><EventFacts /></div>
+    <div className="register-action"><a className="register-action-button" href="/registration">{ctaContent}</a></div>
     <img className="register-adventurer" src={adventurer} alt="VYORA adventurer standing at the VJEC destination" />
     <div className="register-dialogue">SAME PATHS.<br />BRIGHTER TOMORROWS.<span aria-hidden="true">›</span></div>
     <p className="register-footer-meta">VYORA '26<br />VJEC, KANNUR</p>

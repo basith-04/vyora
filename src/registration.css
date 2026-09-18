@@ -1,0 +1,188 @@
+.registration-page {
+  flex: 1;
+  min-width: 0;
+  color: var(--vyora-ink);
+  background-color: var(--vyora-paper);
+  background-image: linear-gradient(rgba(25, 80, 92, .042) 1px, transparent 1px), linear-gradient(90deg, rgba(25, 80, 92, .042) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.registration-container { width: min(100%, 1280px); margin: 0 auto; padding: 22px 16px 62px; }
+.registration-hero { position: relative; padding: 0 0 20px; border-bottom: 1px solid #9cb8b4; }
+.registration-exe { display: block; color: #246374; font: 600 10px/1.55 var(--font-technical); letter-spacing: .03em; }
+.registration-hero h1 { margin: 9px 0 10px; color: var(--vyora-navy); font: clamp(27px, 8.1vw, 39px)/1.07 var(--font-display); letter-spacing: -.035em; }
+.registration-hero h1 span { color: var(--vyora-orange); }
+.registration-hero > p { margin: 0; color: #315465; font: 500 10px/1.55 var(--font-technical); letter-spacing: .015em; }
+.registration-hero-mark { position: absolute; right: 0; top: 2px; color: #82aaad; font: 400 22px/1 var(--font-technical); }
+.registration-progress { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 3px; margin: 17px 0 23px; padding: 0; list-style: none; }
+.registration-progress li { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 5px 1px 0; border-top: 3px solid #b9cac4; color: #607985; font: 600 clamp(7px,2.1vw,10px)/1.2 var(--font-technical); text-align: left; white-space: nowrap; }
+.registration-progress-number { font: 700 17px/1 var(--font-technical); }
+.registration-progress-current { border-top-color: var(--vyora-orange) !important; color: var(--vyora-ink) !important; }
+.registration-progress-done { border-top-color: #178e76 !important; color: #126951 !important; }
+.registration-layout { min-width: 0; }
+.registration-form { display: flex; flex-direction: column; gap: 17px; min-width: 0; }
+.registration-section { position: relative; min-width: 0; padding: 17px 14px 19px; border: 1px solid #7ea4a8; background: rgba(255, 248, 231, .92); box-shadow: inset 0 0 0 2px rgba(255,255,255,.65); scroll-margin-top: 20px; }
+.registration-section::before, .registration-section::after { position: absolute; content: ''; width: 5px; height: 5px; background: var(--vyora-orange); }
+.registration-section::before { top: -2px; left: -2px; }
+.registration-section::after { bottom: -2px; right: -2px; }
+.registration-section-heading { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 18px; padding-bottom: 13px; border-bottom: 1px solid #9eb8b8; }
+.registration-section-index { flex: none; padding-top: 2px; color: var(--vyora-orange); font: 700 13px/1.25 var(--font-technical); }
+.registration-section-heading h2 { margin: 0; color: var(--vyora-navy); font: clamp(17px,5vw,23px)/1.1 var(--font-display); letter-spacing: -.025em; }
+.registration-section-heading p { margin: 5px 0 0; color: #456979; font: 500 10px/1.5 var(--font-technical); }
+.registration-fields { display: grid; gap: 16px; }
+.registration-field { min-width: 0; }
+.registration-field > label, .registration-choice-fieldset > legend, .registration-proof > label:first-child { display: block; margin-bottom: 7px; color: #244d5c; font: 700 11px/1.3 var(--font-technical); letter-spacing: .02em; }
+.registration-field > label span, .registration-choice-fieldset > legend span, .registration-proof > label:first-child span { color: #d24b33; }
+.registration-input-wrap { display: flex; width: 100%; min-width: 0; min-height: 49px; border: 1px solid #799ba4; background: #fffdf3; }
+.registration-input-wrap:focus-within { border-color: var(--vyora-blue); box-shadow: inset 0 0 0 1px var(--vyora-blue); }
+.registration-input-prefix { display: grid; place-items: center; flex: none; width: 55px; border-right: 1px solid #8facaf; background: #e3ebe5; color: var(--vyora-ink); font: 700 15px var(--font-technical); }
+.registration-input-wrap input { width: 100%; min-width: 0; min-height: 47px; padding: 11px 13px; border: 0; border-radius: 0; outline: none; background: transparent; color: var(--vyora-ink); font: 500 16px/1.3 var(--font-technical); }
+.registration-input-wrap input::placeholder { color: #75848a; opacity: 1; }
+.registration-input-wrap:has(input[aria-invalid='true']) { border-color: #c34835; }
+.registration-error { margin: 7px 0 0; color: #a93627; font: 700 11px/1.4 var(--font-technical); }
+.registration-choice-fieldset { min-width: 0; margin: 17px 0 0; padding: 0; border: 0; }
+.registration-choice-fieldset > legend { padding: 0; }
+.registration-year-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.registration-year-option, .registration-ieee-option { position: relative; display: flex; align-items: center; cursor: pointer; border: 1px solid #799ba4; background: #fffdf3; color: var(--vyora-ink); }
+.registration-year-option { min-height: 57px; gap: 7px; padding: 8px 8px; font: 700 clamp(10px,2.6vw,12px)/1.15 var(--font-technical); }
+.registration-choice-number { color: #4c7986; font-size: 11px; }
+.registration-year-option input, .registration-ieee-option input, .registration-workshop-option input { position: absolute; width: 100%; height: 100%; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.registration-year-option:focus-within, .registration-ieee-option:focus-within, .registration-workshop-option:focus-within { outline: 2px solid var(--vyora-blue); outline-offset: 2px; }
+.registration-year-option.is-selected, .registration-ieee-option.is-selected { border-color: var(--vyora-orange); background: #fff0dc; box-shadow: inset 0 0 0 1px var(--vyora-orange); }
+.registration-radio-mark { display: inline-block; flex: none; width: 15px; height: 15px; border: 2px solid #628791; background: #fffdf3; box-shadow: inset 0 0 0 3px #fffdf3; }
+.is-selected .registration-radio-mark { border-color: var(--vyora-orange); background: var(--vyora-orange); }
+.registration-ieee-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.registration-ieee-option { min-height: 83px; flex-direction: column; justify-content: center; align-items: flex-start; gap: 3px; padding: 11px 11px 11px 34px; }
+.registration-ieee-option .registration-radio-mark { position: absolute; left: 11px; top: 15px; }
+.registration-ieee-option strong { font: 24px/1 var(--font-display); }
+.registration-ieee-option > span:last-child { font: 600 10px/1.3 var(--font-technical); }
+.registration-ieee-grid + .registration-error { margin-top: 8px; }
+#registration-ieee > .registration-field { margin-top: 16px; }
+.registration-fee-display { display: flex; justify-content: space-between; align-items: end; gap: 10px; margin-top: 17px; padding: 13px 15px; border: 1px solid #608b93; background: var(--vyora-navy); color: var(--vyora-cream); }
+.registration-fee-display div { display: flex; flex-direction: column; gap: 4px; }
+.registration-fee-display span { font: 600 10px/1.35 var(--font-technical); }
+.registration-fee-display strong { color: #ffd383; font: 31px/1.1 var(--font-display); }
+.registration-fee-display > span { color: var(--vyora-green); text-align: right; }
+.registration-fee-display.is-empty { align-items: center; }
+.registration-fee-display.is-empty strong { color: var(--vyora-cream); font: 700 13px/1.3 var(--font-technical); }
+.registration-free-access { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: -4px 0 15px; color: #126b50; font: 700 10px/1.45 var(--font-technical); }
+.registration-free-access > span:nth-child(2) { color: #789999; }
+.registration-status-dot { display: inline-block; width: 7px; height: 7px; background: #1ea979; }
+.registration-workshop-grid { display: grid; gap: 9px; }
+.registration-workshop-option { --track-accent: var(--vyora-orange); display: block; position: relative; min-width: 0; min-height: 110px; border: 1px solid #658897; background: var(--vyora-navy); color: var(--vyora-cream); cursor: pointer; }
+.registration-workshop-option.registration-accent-blue { --track-accent: #278de7; }
+.registration-workshop-option.registration-accent-green { --track-accent: #2bbb83; }
+.registration-workshop-option.is-selected { box-shadow: 0 0 0 2px var(--track-accent); }
+.registration-workshop-bar { display: flex; justify-content: space-between; align-items: center; min-height: 24px; padding: 3px 8px; background: var(--track-accent); color: var(--vyora-navy); font: 700 11px/1 var(--font-technical); }
+.registration-workshop-bar > span { letter-spacing: .15em; }
+.registration-workshop-body { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-height: 84px; padding: 11px 12px 9px; }
+.registration-workshop-body strong { max-width: 33ch; font: 700 12px/1.35 var(--font-technical); }
+.registration-workshop-select { display: flex; align-items: center; gap: 7px; color: #bdced1; font: 600 10px/1 var(--font-technical); }
+.registration-workshop-option.is-selected .registration-workshop-select { color: var(--vyora-green); }
+.registration-workshop-option .registration-radio-mark { width: 13px; height: 13px; border-color: #9cc4c5; box-shadow: inset 0 0 0 2px var(--vyora-navy); background: var(--vyora-navy); }
+.registration-workshop-option.is-selected .registration-radio-mark { border-color: var(--vyora-green); background: var(--vyora-green); }
+.registration-payment-grid { display: grid; gap: 12px; }
+.registration-pay-amount { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 13px 15px; border: 1px solid #6b9ca2; background: var(--vyora-navy); color: var(--vyora-cream); }
+.registration-pay-amount > span, .registration-pay-amount small { font: 600 11px/1.3 var(--font-technical); }
+.registration-pay-amount strong { color: #ffd383; font: clamp(40px,12vw,52px)/1.1 var(--font-display); }
+.registration-pay-amount small { color: var(--vyora-green); }
+.registration-payment-method { display: grid; grid-template-columns: 95px minmax(0,1fr); gap: 12px; align-items: start; padding: 12px; border: 1px solid #8aadb1; background: #fffdf3; }
+.registration-qr { display: grid; place-items: center; aspect-ratio: 1; border: 1px dashed #769ba4; color: #4f7080; background: repeating-linear-gradient(90deg, #f0f5ec 0 5px, #fffdf3 5px 10px); text-align: center; font: 700 10px/1.4 var(--font-technical); }
+.registration-qr img { width: 100%; height: 100%; object-fit: contain; }
+.registration-upi { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.registration-upi > span { color: #4b6b75; font: 600 10px var(--font-technical); }
+.registration-upi strong { overflow-wrap: anywhere; font: 700 12px/1.3 var(--font-technical); }
+.registration-upi-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.registration-upi-actions button, .registration-upi-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 7px; border: 1px solid var(--vyora-navy); border-radius: 0; background: #dde9e5; color: var(--vyora-navy); text-decoration: none; font: 700 10px/1.2 var(--font-technical); }
+.registration-upi-actions button:not(:disabled), .registration-upi-actions a:not(.is-disabled) { cursor: pointer; background: #b9e1de; }
+.registration-upi-actions button:disabled, .registration-upi-actions a.is-disabled { opacity: .55; cursor: not-allowed; }
+.registration-payment-note { margin: 9px 0 0; color: #5e6770; font: 500 10px/1.5 var(--font-technical); }
+.registration-proof { margin-top: 20px; padding-top: 16px; border-top: 1px solid #9eb8b8; }
+.registration-proof > p { margin: 0 0 10px; color: #617c83; font: 500 10px/1.4 var(--font-technical); }
+.registration-proof input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.registration-file-picker { display: flex; justify-content: space-between; align-items: center; min-height: 49px; padding: 10px 12px; border: 2px solid var(--vyora-navy); background: #e0eae5; color: var(--vyora-navy); cursor: pointer; font: 700 12px/1.2 var(--font-technical); }
+.registration-proof:focus-within .registration-file-picker { outline: 2px solid var(--vyora-blue); outline-offset: 3px; }
+.registration-file-preview { display: flex; gap: 11px; margin-top: 11px; padding: 9px; border: 1px solid #8aacaa; background: #fffdf3; }
+.registration-file-preview img { width: 92px; height: 108px; object-fit: contain; background: #e6ebe5; }
+.registration-file-preview div { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; }
+.registration-file-preview strong { max-width: 100%; overflow-wrap: anywhere; font: 600 11px/1.35 var(--font-technical); }
+.registration-file-preview span { color: #53727b; font: 500 11px var(--font-technical); }
+.registration-file-preview button { min-height: 44px; margin-top: auto; padding: 5px 10px; border: 1px solid #a83c2d; border-radius: 0; background: transparent; color: #a83c2d; cursor: pointer; font: 700 10px var(--font-technical); }
+.registration-review-window { border: 1px solid #65919a; background: #fffdf3; }
+.registration-review-bar { display: flex; justify-content: space-between; align-items: center; min-height: 27px; padding: 4px 9px; background: var(--vyora-navy); color: var(--vyora-cream); font: 700 10px var(--font-technical); }
+.registration-review-window dl { margin: 0; padding: 4px 12px; }
+.registration-review-row { display: grid; grid-template-columns: minmax(95px, 37%) minmax(0,1fr); gap: 8px; padding: 9px 0; border-bottom: 1px solid #c5d1c9; }
+.registration-review-row:last-child { border-bottom: 0; }
+.registration-review-row dt { color: #5d7a80; font: 600 10px/1.3 var(--font-technical); }
+.registration-review-row dd { margin: 0; overflow-wrap: anywhere; color: var(--vyora-navy); font: 700 11px/1.35 var(--font-technical); }
+.registration-review-row dd.is-missing { color: #a24533; }
+.registration-review-edit { display: flex; flex-wrap: wrap; gap: 8px; padding: 9px 12px 12px; border-top: 1px solid #c5d1c9; }
+.registration-review-edit button { min-height: 44px; padding: 5px 7px; border: 1px solid #668d96; border-radius: 0; background: transparent; color: #285b6d; cursor: pointer; font: 700 10px var(--font-technical); }
+.registration-submit { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; min-height: 58px; margin-top: 17px; padding: 11px 13px; border: 2px solid var(--vyora-navy); border-radius: 0; background: var(--vyora-orange); color: var(--vyora-navy); box-shadow: inset 0 0 0 2px #ffb37c, 3px 3px 0 #315160; cursor: pointer; text-align: left; font: 700 clamp(12px,3.5vw,16px)/1.2 var(--font-technical); transition: transform .12s steps(2,end), box-shadow .12s steps(2,end); }
+.registration-submit:hover { transform: translate(-2px,-2px); box-shadow: inset 0 0 0 2px #ffb37c, 5px 5px 0 #315160; }
+.registration-submit:active { transform: translate(1px,1px); box-shadow: inset 0 0 0 2px #ffb37c; }
+.registration-submit span { font-size: 22px; }
+.registration-submit-note { margin: 11px 0 0; color: #58727b; font: 500 10px/1.5 var(--font-technical); }
+.registration-sidebar { display: none; }
+.registration-terminal { width: min(100%,760px); min-height: 380px; margin: 30px auto; padding: 25px 18px; border: 1px solid #65a0a5; background: var(--vyora-navy); color: var(--vyora-cream); box-shadow: inset 0 0 0 3px #123c4b; }
+.registration-terminal > span { color: var(--vyora-green); font: 600 11px var(--font-technical); }
+.registration-terminal h1 { margin: 22px 0; font: clamp(26px,6.7vw,50px)/1.13 var(--font-display); }
+.registration-loading-track { height: 23px; padding: 3px; border: 1px solid #77adb0; }
+.registration-loading-track span { display: block; height: 100%; background: repeating-linear-gradient(90deg,var(--vyora-green) 0 12px,var(--vyora-navy) 12px 15px); transition: width .2s steps(8,end); }
+.registration-initializing > strong { display: block; margin-top: 9px; color: var(--vyora-green); font: 700 16px var(--font-technical); text-align: right; }
+.registration-loading-lines { min-height: 105px; margin-top: 21px; color: #aac9c8; font: 600 11px/1.35 var(--font-technical); }
+.registration-loading-lines p { margin: 8px 0; }
+.registration-success-mark { display: grid; place-items: center; width: 50px; height: 50px; margin-top: 26px; border: 2px solid var(--vyora-green); color: var(--vyora-green); font: 700 32px var(--font-technical); }
+.registration-success h1 { margin-top: 15px; }
+.registration-success-grid { display: grid; gap: 1px; margin: 24px 0; border: 1px solid #5b8790; background: #5b8790; }
+.registration-success-grid > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; background: #0b2b3b; }
+.registration-success-grid span { color: #9bbdc2; font: 600 10px var(--font-technical); }
+.registration-success-grid strong { overflow-wrap: anywhere; font: 700 12px/1.35 var(--font-technical); }
+.registration-success-grid .registration-pending { color: #ffad62; }
+.registration-success > p { max-width: 60ch; color: #d3e2db; font: 500 12px/1.6 var(--font-technical); }
+.registration-success-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0; }
+.registration-success-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 9px 13px; border: 1px solid var(--vyora-orange); text-decoration: none; color: var(--vyora-cream); font: 700 11px var(--font-technical); }
+.registration-success-actions a:first-child { background: var(--vyora-orange); color: var(--vyora-navy); }
+.registration-success > small { color: #81a7a8; font: 500 9px/1.4 var(--font-technical); }
+.registration-sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+
+@media (min-width: 700px) {
+  .registration-container { padding: 34px 30px 85px; }
+  .registration-hero { padding-bottom: 23px; }
+  .registration-exe { font-size: 12px; }
+  .registration-hero h1 { font-size: clamp(40px,6vw,72px); }
+  .registration-hero > p { font-size: 12px; }
+  .registration-progress { gap: 9px; margin: 24px 0 30px; }
+  .registration-progress li { flex-direction: row; align-items: center; gap: 9px; font-size: 11px; }
+  .registration-progress-number { font-size: 19px; }
+  .registration-form { gap: 24px; }
+  .registration-section { padding: 24px 26px 28px; }
+  .registration-section-heading { margin-bottom: 22px; }
+  .registration-fields { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+  .registration-fields .registration-field:first-child { grid-column: 1 / -1; }
+  .registration-year-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .registration-workshop-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .registration-workshop-option { min-height: 145px; }
+  .registration-workshop-body { min-height: 118px; }
+  .registration-payment-grid { grid-template-columns: minmax(190px,.8fr) minmax(0,1.4fr); }
+  .registration-payment-method { grid-template-columns: 115px minmax(0,1fr); }
+  .registration-terminal { padding: 38px; }
+  .registration-success-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (min-width: 1050px) {
+  .registration-layout { display: grid; grid-template-columns: minmax(0,1fr) 265px; align-items: start; gap: 24px; }
+  .registration-sidebar { display: block; position: sticky; top: 22px; border: 1px solid #61929b; background: var(--vyora-navy); color: var(--vyora-cream); }
+  .registration-sidebar-bar { display: flex; justify-content: space-between; padding: 9px 11px; border-bottom: 1px solid #6794a0; color: var(--vyora-green); font: 700 11px var(--font-technical); }
+  .registration-sidebar-body { display: flex; flex-direction: column; gap: 7px; padding: 16px; }
+  .registration-sidebar-body > span { margin-top: 14px; padding-top: 12px; border-top: 1px solid #315765; color: #9dbdc4; font: 600 10px var(--font-technical); }
+  .registration-sidebar-body > span:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .registration-sidebar-body strong { color: #ffd383; font: 36px/1 var(--font-display); }
+  .registration-sidebar-body small { color: var(--vyora-green); font: 600 10px var(--font-technical); }
+  .registration-sidebar-body b { font: 700 12px/1.4 var(--font-technical); }
+  .registration-sidebar-body b.is-ready { color: var(--vyora-green); }
+}
+@media (max-width: 380px) {
+  .registration-container { padding-inline: 12px; }
+  .registration-section { padding-inline: 11px; }
+  .registration-payment-method { grid-template-columns: 80px minmax(0,1fr); gap: 8px; padding: 8px; }
+  .registration-upi-actions button, .registration-upi-actions a { font-size: 9px; }
+}

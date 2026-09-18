@@ -105,12 +105,12 @@ function MissionStatus() {
 
 export default function ProgramPage() {
   return (
-    <main className="program-page" id="main-content">
-      <img className="program-journey-art" src={journeyArt} alt="Pixel-art mountains and an orange expedition bus on a winding road" />
+    <section className="program-page site-section" id="program" aria-labelledby="program-heading">
+      <img className="program-journey-art" src={journeyArt} alt="Pixel-art mountains and an orange expedition bus on a winding road" loading="lazy" decoding="async" />
       <span className="program-crosshair crosshair-left" aria-hidden="true" />
       <span className="program-crosshair crosshair-right" aria-hidden="true" />
       <div className="program-heading">
-        <h1><span>//</span> PROGRAM.EXE</h1>
+        <h1 id="program-heading"><span>//</span> PROGRAM.EXE</h1>
         <p>A TWO-DAY JOURNEY.<br />DIFFERENT PERSPECTIVES. A BRIGHTER YOU.</p>
       </div>
       <aside className="program-callout">SAME PEOPLE<br />NEW IDEAS<br />BIGGER TOMORROWS</aside>
@@ -119,6 +119,6 @@ export default function ProgramPage() {
         {days.map((day) => <DaySchedule day={day} key={day.number} />)}
       </div>
       <MissionStatus />
-    </main>
+    </section>
   );
 }

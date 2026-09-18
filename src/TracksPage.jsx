@@ -11,8 +11,8 @@ const tracks = [
     titleLines: ['DATA SCIENCE AND', 'ANALYTICS USING PYTHON'],
     descriptor: 'DATA / ANALYSIS / VISUALISATION',
     speakerLabel: 'SPEAKER',
-    speakers: ['Ms. Aleena K Shibu'],
-    affiliation: 'BMS Application Engineer',
+    speakers: ['Sreeram M R'],
+    affiliation: 'Entri App',
     action: 'INSPECT TRACK',
   },
   {
@@ -124,15 +124,18 @@ export default function TracksPage() {
 
   function selectTrack(number) {
     setSelectedTrack(number);
-    if (window.matchMedia('(max-width: 760px)').matches) document.getElementById(`track-${number}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById(`track-${number}`)?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' });
+    }
   }
 
   return (
-    <main className="tracks-page" id="main-content">
+    <section className="tracks-page site-section" id="tracks" aria-labelledby="tracks-heading">
       <span className="tracks-crosshair tracks-crosshair-left" aria-hidden="true" />
       <span className="tracks-crosshair tracks-crosshair-right" aria-hidden="true" />
       <div className="tracks-top">
-        <div className="tracks-heading"><p>// TRACKS.EXE</p><h1>CHOOSE YOUR PATH.</h1></div>
+        <div className="tracks-heading"><p>// TRACKS.EXE</p><h1 id="tracks-heading">CHOOSE YOUR PATH.</h1></div>
         <div className="aidex-identity"><h2>AIDEX</h2><p>ADVANCING INTELLIGENCE,<br />DEVELOPMENT, ENGAGEMENT<br />&amp; EXCELLENCE</p></div>
         <aside className="aidex-access" aria-label="AIDEX workshop access"><strong>AIDEX WORKSHOP SERIES</strong><span>03 WORKSHOPS</span><div><b>WORKSHOP ACCESS: FREE</b><b>NO ADDITIONAL FEE</b></div></aside>
       </div>
@@ -141,12 +144,12 @@ export default function TracksPage() {
         {tracks.map((track)=><TrackWindow key={track.number} track={track} selected={selectedTrack === track.number} onSelect={()=>selectTrack(track.number)} />)}
       </section>
       <div className="tracks-expedition">
-        <img className="tracks-landscape" src={landscape} alt="Layered pixel-art mountains and forest in the VYORA expedition world" />
-        <img className="tracks-adventurer" src={adventurer} alt="VYORA adventurer overlooking the mountains" />
+        <img className="tracks-landscape" src={landscape} alt="Layered pixel-art mountains and forest in the VYORA expedition world" loading="lazy" decoding="async" />
+        <img className="tracks-adventurer" src={adventurer} alt="VYORA adventurer overlooking the mountains" loading="lazy" decoding="async" />
         <div className="tracks-dialogue">NOT JUST TECH.<br />A STRONGER COMMUNITY.<span aria-hidden="true">›</span></div>
         <TrackSelector selected={selectedTrack} onSelect={selectTrack} />
         <div className="tracks-footer-meta">VYORA '26<br />VJEC, KANNUR</div>
       </div>
-    </main>
+    </section>
   );
 }

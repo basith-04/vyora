@@ -46,7 +46,7 @@ function SpeakerWindow({ speaker }) {
   return <article className={`speaker-window speaker-window-${speaker.tone}`} aria-labelledby={`speaker-${speaker.number}`}>
     <div className="speaker-window-bar"><span className="speaker-window-arrow" aria-hidden="true">▶</span><span>{speaker.number}</span><span className="speaker-window-controls" aria-hidden="true">− □ ×</span></div>
     <div className="speaker-window-body">
-      <div className="speaker-photo-frame"><img className="speaker-portrait" src={speaker.portrait} alt={speaker.name} /></div>
+      <div className="speaker-photo-frame"><img className="speaker-portrait" src={speaker.portrait} alt={speaker.name} loading="lazy" decoding="async" /></div>
       <div className="speaker-window-copy">
         <h2 id={`speaker-${speaker.number}`}>{speaker.nameLines.map((line) => <span key={line}>{line}</span>)}</h2>
         <p className="speaker-role">{speaker.role.map((line) => <span key={line}>{line}</span>)}</p>
@@ -63,8 +63,8 @@ function TechnicalNote() {
 }
 
 export default function PeoplePage() {
-  return <main className="people-page" id="main-content">
-    <img className="people-landscape" src={landscape} alt="" aria-hidden="true" />
+  return <section className="people-page site-section" id="people" aria-labelledby="people-heading">
+    <img className="people-landscape" src={landscape} alt="" aria-hidden="true" loading="lazy" decoding="async" />
     <span className="people-sky-mask" aria-hidden="true" />
     <span className="people-crosshair people-crosshair-top-left" aria-hidden="true" />
     <span className="people-crosshair people-crosshair-mid-left" aria-hidden="true" />
@@ -72,15 +72,15 @@ export default function PeoplePage() {
     <span className="people-crosshair people-crosshair-top-right" aria-hidden="true" />
     <span className="people-crosshair people-crosshair-mid-right" aria-hidden="true" />
     <div className="people-header">
-      <div className="people-heading"><p>// PEOPLE.EXE</p><h1><span>MEET OUR</span><span>GUEST SPEAKERS.</span></h1></div>
+      <div className="people-heading"><p>// PEOPLE.EXE</p><h1 id="people-heading"><span>MEET OUR</span><span>GUEST SPEAKERS.</span></h1></div>
       <p className="people-header-aside">EXPERTS.<br />PERSPECTIVES.<br />REAL-WORLD INSIGHTS.</p>
       <TechnicalNote />
     </div>
     <p className="people-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</p>
     <section className="people-speakers" aria-label="Guest speakers">{speakers.map((speaker) => <SpeakerWindow key={speaker.number} speaker={speaker} />)}</section>
-    <img className="people-adventurer" src={adventurer} alt="VYORA adventurer standing among the mountains" />
+    <img className="people-adventurer" src={adventurer} alt="VYORA adventurer standing among the mountains" loading="lazy" decoding="async" />
     <div className="people-dialogue">PEOPLE BUILD<br />BRIGHTER TOMORROWS.<span aria-hidden="true">›</span></div>
     <p className="people-handwritten">Different<br /><span>Journeys.</span><br /><span>Shared Purpose.</span></p>
     <p className="people-footer-meta">VYORA '26<br />VJEC, KANNUR</p>
-  </main>;
+  </section>;
 }

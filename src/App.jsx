@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import desktopHero from '../assets/hero-vjec-desktop.png';
 import mobileHero from '../assets/hero-vjec-mobile.png';
 import standingAdventurer from '../assets/vyora-adventurer-standing.png';
@@ -8,15 +8,85 @@ import FieldPage from './FieldPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import PeoplePage from './PeoplePage.jsx';
 import RegistrationPage from './RegistrationPage.jsx';
+import { publicSections } from './siteNavigation.js';
 
-const navigation = [
-  { label: 'Home', href: '/' },
-  { label: 'Program', href: '/program' },
-  { label: 'Tracks', href: '/tracks' },
-  { label: 'People', href: '/people' },
-  { label: 'Field', href: '/field' },
-  { label: 'Register', href: '/register' },
-];
+const sectionIds = new Set(publicSections.map(({ id }) => id));
+
+function usePublicSectionTracking(enabled) {
+  const [activeSection, setActiveSection] = useState(() => {
+    const hash = window.location.hash.slice(1);
+    return sectionIds.has(hash) ? hash : 'home';
+  });
+  const pendingAnchor = useRef(null);
+
+  useLayoutEffect(() => {
+    const previousRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    if (!enabled) {
+      window.scrollTo(0, 0);
+    } else {
+      const hash = window.location.hash.slice(1);
+      if (sectionIds.has(hash)) {
+        const previousBehavior = document.documentElement.style.scrollBehavior;
+        document.documentElement.style.scrollBehavior = 'auto';
+        document.getElementById(hash)?.scrollIntoView({ block: 'start', behavior: 'instant' });
+        document.documentElement.style.scrollBehavior = previousBehavior;
+      } else {
+        window.scrollTo(0, 0);
+      }
+    }
+    return () => { window.history.scrollRestoration = previousRestoration; };
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const sections = publicSections.map(({ id }) => document.getElementById(id)).filter(Boolean);
+    const header = document.querySelector('.site-header');
+
+    const update = () => {
+      const marker = Math.max((header?.getBoundingClientRect().height || 59) + 1, window.innerHeight * .25);
+      let current = 'home';
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= marker) current = section.id;
+      }
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) current = 'register';
+      setActiveSection((previous) => previous === current ? previous : current);
+
+      if (pendingAnchor.current && pendingAnchor.current !== current) return;
+      pendingAnchor.current = null;
+      const nextHash = `#${current}`;
+      if (window.location.hash !== nextHash && !(current === 'home' && !window.location.hash)) {
+        window.history.replaceState(window.history.state, '', `/${window.location.search}${nextHash}`);
+      }
+    };
+
+    const observer = new IntersectionObserver(update, {
+      rootMargin: `-${Math.ceil(header?.getBoundingClientRect().height || 59)}px 0px -75% 0px`,
+      threshold: 0,
+    });
+    sections.forEach((section) => observer.observe(section));
+    const frame = window.requestAnimationFrame(update);
+    const clearPending = () => { pendingAnchor.current = null; };
+    const syncHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (sectionIds.has(hash)) setActiveSection(hash);
+    };
+    window.addEventListener('wheel', clearPending, { passive: true });
+    window.addEventListener('touchstart', clearPending, { passive: true });
+    window.addEventListener('hashchange', syncHash);
+    window.addEventListener('scrollend', update);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('wheel', clearPending);
+      window.removeEventListener('touchstart', clearPending);
+      window.removeEventListener('hashchange', syncHash);
+      window.removeEventListener('scrollend', update);
+    };
+  }, [enabled]);
+
+  return { activeSection, onSectionNavigate: (id) => { pendingAnchor.current = id; setActiveSection(id); } };
+}
 
 function VyoraMark() {
   return (
@@ -40,9 +110,9 @@ function WindowChrome() {
   );
 }
 
-function Navbar({ activePath }) {
+function Navbar({ activeSection, isRegistration, onSectionNavigate }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const navPath = activePath === '/registration' ? '/register' : activePath;
+  const selectedSection = isRegistration ? 'register' : activeSection;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -55,13 +125,13 @@ function Navbar({ activePath }) {
 
   return (
     <header className="site-header">
-      <a className="brand" href="/" aria-label="VYORA '26, Home" onClick={() => setMenuOpen(false)}>
+      <a className="brand" href={isRegistration ? '/#home' : '#home'} aria-label="VYORA '26, Home" onClick={() => { setMenuOpen(false); if (!isRegistration) onSectionNavigate('home'); }}>
         <VyoraMark />
         <span>VYORA<span className="brand-apostrophe">'</span>26</span>
       </a>
       <nav className="desktop-nav" aria-label="Main navigation">
-        {navigation.map(({ label, href }) => (
-          <a key={label} href={href} className={navPath === href ? 'active' : undefined} aria-current={navPath === href ? 'page' : undefined}>{label}</a>
+        {publicSections.map(({ label, id }) => (
+          <a key={id} href={isRegistration ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isRegistration && activeSection === id ? 'location' : undefined} onClick={() => { if (!isRegistration) onSectionNavigate(id); }}>{label}</a>
         ))}
       </nav>
       <span className="header-motto" aria-hidden="true"><span>────→</span> A BRIGHTER TOMORROW</span>
@@ -77,8 +147,8 @@ function Navbar({ activePath }) {
       </button>
       <nav id="mobile-navigation" className={`mobile-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Mobile navigation" inert={!menuOpen}>
         <span className="mobile-nav-heading">// SELECT DESTINATION</span>
-        {navigation.map(({ label, href }, index) => (
-          <a key={label} href={href} className={navPath === href ? 'active' : undefined} aria-current={navPath === href ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
+        {publicSections.map(({ label, id }, index) => (
+          <a key={id} href={isRegistration ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isRegistration && activeSection === id ? 'location' : undefined} onClick={() => { setMenuOpen(false); if (!isRegistration) onSectionNavigate(id); }}>
             <span className="nav-index">0{index + 1}</span>{label}<span className="nav-arrow">→</span>
           </a>
         ))}
@@ -136,7 +206,7 @@ function LocationPlaque() {
 
 function HomeHero() {
   return (
-    <main className="home-hero" id="main-content">
+    <section className="home-hero site-section" id="home" aria-labelledby="home-heading">
       <picture className="hero-art">
         <source media="(max-width: 900px)" srcSet={mobileHero} />
         <img src={desktopHero} alt="Pixel-art view of Vimal Jyothi Engineering College beneath a vivid blue sky" fetchPriority="high" />
@@ -146,37 +216,40 @@ function HomeHero() {
       <span className="hero-crosshair crosshair-two" aria-hidden="true" />
       <span className="hero-ruler" aria-hidden="true" />
       <EventMetadata />
-      <h1 className="hero-title"><span>VYORA</span><span className="year">'26</span></h1>
+      <h1 className="hero-title" id="home-heading"><span>VYORA</span><span className="year">'26</span></h1>
       <JourneyList />
       <div className="registration-group">
-        <a className="registration-cta" href="/register"><span aria-hidden="true">›</span> INITIALIZE REGISTRATION <span aria-hidden="true">→</span></a>
+        <a className="registration-cta" href="/registration"><span aria-hidden="true">›</span> INITIALIZE REGISTRATION <span aria-hidden="true">→</span></a>
         <RegistrationStatus />
       </div>
       <p className="handwritten-note">Same Minds.<br /><span>Higher Ground.</span></p>
       <LocationPlaque />
-    </main>
+    </section>
   );
 }
 
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
-  const isProgram = activePath === '/program';
-  const isTracks = activePath === '/tracks';
-  const isField = activePath === '/field';
-  const isRegister = activePath === '/register';
-  const isPeople = activePath === '/people';
   const isRegistration = activePath === '/registration';
+  const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isRegistration);
 
   useEffect(() => {
-    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : isPeople ? "PEOPLE.EXE — VYORA '26" : isRegister ? "REGISTER.EXE — VYORA '26" : isField ? "FIELD MISSION — VYORA '26" : isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
-  }, [isProgram, isTracks, isField, isRegister, isPeople, isRegistration]);
+    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
+  }, [isRegistration]);
 
   return (
     <div className="desktop-surround">
-      <div className="app-shell">
+      <div className={`app-shell${isRegistration ? '' : ' public-app-shell'}`}>
         <WindowChrome />
-        <Navbar activePath={activePath} />
-        {isRegistration ? <RegistrationPage /> : isPeople ? <PeoplePage /> : isRegister ? <RegisterPage /> : isField ? <FieldPage /> : isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
+        <Navbar activeSection={activeSection} isRegistration={isRegistration} onSectionNavigate={onSectionNavigate} />
+        {isRegistration ? <RegistrationPage /> : <main className="public-journey" id="main-content">
+          <HomeHero />
+          <ProgramPage />
+          <TracksPage />
+          <PeoplePage />
+          <FieldPage />
+          <RegisterPage />
+        </main>}
       </div>
     </div>
   );

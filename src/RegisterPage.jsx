@@ -55,19 +55,19 @@ export default function RegisterPage() {
   const [selectedTier, setSelectedTier] = useState('ieee');
   const ctaContent = <>INITIALIZE REGISTRATION <span aria-hidden="true">→</span></>;
 
-  return <main className="register-page" id="main-content">
-    <img className="register-landscape" src={landscape} alt="Pixel-art mountains, forests, and Vimal Jyothi Engineering College" />
+  return <section className="register-page site-section" id="register" aria-labelledby="register-heading">
+    <img className="register-landscape" src={landscape} alt="Pixel-art mountains, forests, and Vimal Jyothi Engineering College" loading="lazy" decoding="async" />
     <span className="register-crosshair register-crosshair-one" aria-hidden="true" />
     <span className="register-crosshair register-crosshair-two" aria-hidden="true" />
     <span className="register-crosshair register-crosshair-three" aria-hidden="true" />
     <span className="register-crosshair register-crosshair-four" aria-hidden="true" />
-    <div className="register-heading"><p>// REGISTER.EXE — INITIALIZATION</p><h1>READY TO BEGIN?</h1><p>SELECT YOUR REGISTRATION TIER AND INITIALIZE.</p></div>
+    <div className="register-heading"><p>// REGISTER.EXE — INITIALIZATION</p><h1 id="register-heading">READY TO BEGIN?</h1><p>SELECT YOUR REGISTRATION TIER AND INITIALIZE.</p></div>
     <aside className="register-annotation">SAME MINDS.<br />MORE POSSIBILITIES.<br />A BRIGHTER TOMORROW.</aside>
     <p className="register-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</p>
     <div className="register-content"><section className="register-tiers" aria-label="Registration tiers">{tiers.map((tier) => <RegistrationTier key={tier.id} tier={tier} selected={selectedTier === tier.id} onSelect={() => setSelectedTier(tier.id)} />)}</section><EventFacts /></div>
     <div className="register-action"><a className="register-action-button" href="/registration">{ctaContent}</a></div>
-    <img className="register-adventurer" src={adventurer} alt="VYORA adventurer standing at the VJEC destination" />
+    <img className="register-adventurer" src={adventurer} alt="VYORA adventurer standing at the VJEC destination" loading="lazy" decoding="async" />
     <div className="register-dialogue">SAME PATHS.<br />BRIGHTER TOMORROWS.<span aria-hidden="true">›</span></div>
     <p className="register-footer-meta">VYORA '26<br />VJEC, KANNUR</p>
-  </main>;
+  </section>;
 }

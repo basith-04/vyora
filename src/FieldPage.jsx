@@ -36,22 +36,22 @@ function PerspectiveSign() {
 
 export default function FieldPage() {
   return (
-    <main className="field-page" id="main-content">
+    <section className="field-page site-section" id="field" aria-labelledby="field-heading">
       <div className="field-scene">
         <picture className="field-art">
           <source media="(max-width: 700px)" srcSet={mobileLandscape} />
-          <img src={desktopLandscape} alt="Pixel-art sunset over the layered Palakkayam Thattu mountains and valley" fetchPriority="high" />
+          <img src={desktopLandscape} alt="Pixel-art sunset over the layered Palakkayam Thattu mountains and valley" loading="lazy" decoding="async" />
         </picture>
         <div className="field-cliff-art" aria-hidden="true" />
         <div className="field-cream-wash" aria-hidden="true" />
         <p className="field-handwritten">Step out.<br /><span>See further.</span></p>
         <p className="field-coordinates">11.9283° N<br />75.9569° E<br /><span>KANNUR, INDIA</span></p>
-        <img className="field-adventurer" src={seatedAdventurer} alt="VYORA adventurer seated on a cliff, looking toward the sunset" />
+        <img className="field-adventurer" src={seatedAdventurer} alt="VYORA adventurer seated on a cliff, looking toward the sunset" loading="lazy" decoding="async" />
         <PerspectiveSign />
       </div>
       <div className="field-intro">
         <p className="field-mission-label">// FIELD MISSION / 04</p>
-        <h1><span>PALAKKAYAM</span><span>THATTU</span></h1>
+        <h1 id="field-heading"><span>PALAKKAYAM</span><span>THATTU</span></h1>
         <p className="field-time" aria-label="03:30 PM to 08:00 PM">03:30 PM <span aria-hidden="true">→</span> 08:00 PM</p>
         <ActivityList />
       </div>
@@ -63,6 +63,6 @@ export default function FieldPage() {
       <span className="field-mark field-mark-middle" aria-hidden="true" />
       <span className="field-bracket field-bracket-top" aria-hidden="true" />
       <span className="field-bracket field-bracket-bottom" aria-hidden="true" />
-    </main>
+    </section>
   );
 }

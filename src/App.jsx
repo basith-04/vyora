@@ -184,7 +184,7 @@ function JourneyList() {
 
 function RegistrationStatus() {
   return (
-    <div className="registration-status" aria-label="Registration open, 150 participant slots">
+    <div className="registration-status" aria-label="Registration open, limited slots">
       <img src={standingAdventurer} alt="VYORA adventurer" />
       <div className="registration-status-copy">
         <span className="status-open">REGISTRATION OPEN</span>
@@ -228,6 +228,10 @@ function HomeHero() {
   );
 }
 
+function ChapterBoundary() {
+  return <div className="chapter-boundary" aria-hidden="true" />;
+}
+
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
@@ -244,10 +248,15 @@ export default function App() {
         <Navbar activeSection={activeSection} isRegistration={isRegistration} onSectionNavigate={onSectionNavigate} />
         {isRegistration ? <RegistrationPage /> : <main className="public-journey" id="main-content">
           <HomeHero />
+          <ChapterBoundary />
           <ProgramPage />
+          <ChapterBoundary />
           <TracksPage />
+          <ChapterBoundary />
           <PeoplePage />
+          <ChapterBoundary />
           <FieldPage />
+          <ChapterBoundary />
           <RegisterPage />
         </main>}
       </div>

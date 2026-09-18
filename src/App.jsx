@@ -7,6 +7,7 @@ import TracksPage from './TracksPage.jsx';
 import FieldPage from './FieldPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import PeoplePage from './PeoplePage.jsx';
+import RegistrationPage from './RegistrationPage.jsx';
 
 const navigation = [
   { label: 'Home', href: '/' },
@@ -41,6 +42,7 @@ function WindowChrome() {
 
 function Navbar({ activePath }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navPath = activePath === '/registration' ? '/register' : activePath;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -59,7 +61,7 @@ function Navbar({ activePath }) {
       </a>
       <nav className="desktop-nav" aria-label="Main navigation">
         {navigation.map(({ label, href }) => (
-          <a key={label} href={href} className={activePath === href ? 'active' : undefined} aria-current={activePath === href ? 'page' : undefined}>{label}</a>
+          <a key={label} href={href} className={navPath === href ? 'active' : undefined} aria-current={navPath === href ? 'page' : undefined}>{label}</a>
         ))}
       </nav>
       <span className="header-motto" aria-hidden="true"><span>────→</span> A BRIGHTER TOMORROW</span>
@@ -76,7 +78,7 @@ function Navbar({ activePath }) {
       <nav id="mobile-navigation" className={`mobile-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Mobile navigation" inert={!menuOpen}>
         <span className="mobile-nav-heading">// SELECT DESTINATION</span>
         {navigation.map(({ label, href }, index) => (
-          <a key={label} href={href} className={activePath === href ? 'active' : undefined} aria-current={activePath === href ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
+          <a key={label} href={href} className={navPath === href ? 'active' : undefined} aria-current={navPath === href ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
             <span className="nav-index">0{index + 1}</span>{label}<span className="nav-arrow">→</span>
           </a>
         ))}
@@ -90,13 +92,12 @@ function EventMetadata() {
   return (
     <div className="event-metadata" aria-label="Event details">
       <div className="event-host">
-        <span>IEEE SB × IEEE CIS</span>
+        <span>IEEE SB VJEC & IEEE CIS VJEC</span>
         <span>VIMAL JYOTHI ENGINEERING COLLEGE</span>
-        <span>KANNUR, INDIA</span>
+        <span>CHEMPERI</span>
       </div>
       <div className="event-brief">
         <span>09 — 10 OCT 2026</span>
-        <span>NATIONAL LEVEL</span>
         <span>SYSTEM ID: VYR-26</span>
       </div>
     </div>
@@ -117,7 +118,7 @@ function RegistrationStatus() {
       <img src={standingAdventurer} alt="VYORA adventurer" />
       <div className="registration-status-copy">
         <span className="status-open">REGISTRATION OPEN</span>
-        <span>150 PARTICIPANT SLOTS</span>
+        <span>LIMITED SLOTS</span>
       </div>
     </div>
   );
@@ -146,7 +147,6 @@ function HomeHero() {
       <span className="hero-ruler" aria-hidden="true" />
       <EventMetadata />
       <h1 className="hero-title"><span>VYORA</span><span className="year">'26</span></h1>
-      <p className="hero-tagline"><span>TWO DAYS.</span><span>THREE TRACKS.</span><span>ONE EXPEDITION INTO</span><span className="tagline-highlight">WHAT COMES NEXT.</span></p>
       <JourneyList />
       <div className="registration-group">
         <a className="registration-cta" href="/register"><span aria-hidden="true">›</span> INITIALIZE REGISTRATION <span aria-hidden="true">→</span></a>
@@ -165,17 +165,18 @@ export default function App() {
   const isField = activePath === '/field';
   const isRegister = activePath === '/register';
   const isPeople = activePath === '/people';
+  const isRegistration = activePath === '/registration';
 
   useEffect(() => {
-    document.title = isPeople ? "PEOPLE.EXE — VYORA '26" : isRegister ? "REGISTER.EXE — VYORA '26" : isField ? "FIELD MISSION — VYORA '26" : isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
-  }, [isProgram, isTracks, isField, isRegister, isPeople]);
+    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : isPeople ? "PEOPLE.EXE — VYORA '26" : isRegister ? "REGISTER.EXE — VYORA '26" : isField ? "FIELD MISSION — VYORA '26" : isTracks ? "TRACKS.EXE — VYORA '26" : isProgram ? "PROGRAM.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
+  }, [isProgram, isTracks, isField, isRegister, isPeople, isRegistration]);
 
   return (
     <div className="desktop-surround">
       <div className="app-shell">
         <WindowChrome />
         <Navbar activePath={activePath} />
-        {isPeople ? <PeoplePage /> : isRegister ? <RegisterPage /> : isField ? <FieldPage /> : isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
+        {isRegistration ? <RegistrationPage /> : isPeople ? <PeoplePage /> : isRegister ? <RegisterPage /> : isField ? <FieldPage /> : isTracks ? <TracksPage /> : isProgram ? <ProgramPage /> : <HomeHero />}
       </div>
     </div>
   );

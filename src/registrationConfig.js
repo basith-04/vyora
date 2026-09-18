@@ -1,6 +1,8 @@
+import upiQr from '../assets/payment/upiQr.png';
+
 export const registrationConfig = {
   prices: { ieee: 399, nonIeee: 799 },
-  payment: { upiId: null, payeeName: null, qrAsset: null },
+  payment: { upiId: null, payeeName: null, qrAsset: upiQr },
   maxPaymentProofBytes: 5 * 1024 * 1024,
 };
 

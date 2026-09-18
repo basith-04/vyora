@@ -162,7 +162,7 @@ function EventMetadata() {
   return (
     <div className="event-metadata" aria-label="Event details">
       <div className="event-host">
-        <span>IEEE SB VJEC & IEEE CIS VJEC</span>
+        <span>IEEE SB VJEC & IEEE CIS SBC VJEC</span>
         <span>VIMAL JYOTHI ENGINEERING COLLEGE</span>
         <span>CHEMPERI</span>
       </div>

@@ -136,7 +136,7 @@ export default function TracksPage() {
       <span className="tracks-crosshair tracks-crosshair-right" aria-hidden="true" />
       <div className="tracks-top">
         <div className="tracks-heading"><p>// TRACKS.EXE</p><h1 id="tracks-heading">CHOOSE YOUR PATH.</h1></div>
-        <div className="aidex-identity"><h2>AIDEX</h2><p>ADVANCING INTELLIGENCE,<br />DEVELOPMENT, ENGAGEMENT<br />&amp; EXCELLENCE</p></div>
+        <div className="aidex-identity"><h2>AIDEXX</h2><p>ADVANCING INTELLIGENCE,<br />DEVELOPMENT, ENGAGEMENT<br />&amp; EXCELLENCE</p></div>
         <aside className="aidex-access" aria-label="AIDEX workshop access"><strong>AIDEX WORKSHOP SERIES</strong><span>03 WORKSHOPS</span><div><b>WORKSHOP ACCESS: FREE</b><b>NO ADDITIONAL FEE</b></div></aside>
       </div>
       <div className="tracks-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</div>

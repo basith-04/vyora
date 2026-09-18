@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import landscape from '../assets/egister-vjec-landscape-strip.png';
 import adventurer from '../assets/vyora-adventurer-standing.png';
+import { registrationConfig } from './registrationConfig.js';
 import './register.css';
 
 const tiers = [
-  { id: 'ieee', label: 'IEEE MEMBER', lines: ['IEEE MEMBER', 'STANDARD'], price: '₹499' },
-  { id: 'non-ieee', label: 'NON-IEEE', lines: ['STANDARD', 'NON-IEEE'], price: '₹899' },
+  { id: 'ieee', label: 'IEEE MEMBER', lines: ['IEEE MEMBER', 'STANDARD'], price: registrationConfig.prices.ieee },
+  { id: 'non-ieee', label: 'NON-IEEE', lines: ['STANDARD', 'NON-IEEE'], price: registrationConfig.prices.nonIeee },
 ];
 
 function MemberIcon() {
@@ -34,7 +35,7 @@ function RegistrationTier({ tier, selected, onSelect }) {
     <span className="register-tier-body">
       <span className="register-tier-identity">{tier.id === 'ieee' ? <MemberIcon /> : <PeopleIcon />}<span><strong>{tier.lines[0]}</strong><small>{tier.lines[1]}</small></span></span>
       <span className="register-tier-rule" />
-      <strong className="register-tier-price">{tier.price}</strong>
+      <strong className="register-tier-price">₹{tier.price}</strong>
       <span className="register-tier-unit">PER PARTICIPANT</span>
       <WireframeMountains />
     </span>
@@ -42,7 +43,7 @@ function RegistrationTier({ tier, selected, onSelect }) {
 }
 
 const facts = [
-  { label: 'CAPACITY', value: '150 PARTICIPANTS', Icon: PeopleIcon },
+  { label: 'REGISTRATION', value: 'LIMITED SLOTS', Icon: PeopleIcon },
   { label: 'DATE', value: '09–10 OCT 2026', Icon: CalendarIcon },
   { label: 'VENUE', value: 'VJEC, KANNUR', Icon: PinIcon },
 ];

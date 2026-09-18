@@ -1,5 +1,5 @@
 export const registrationConfig = {
-  prices: { ieee: 499, nonIeee: 899 },
+  prices: { ieee: 399, nonIeee: 799 },
   payment: { upiId: null, payeeName: null, qrAsset: null },
   maxPaymentProofBytes: 5 * 1024 * 1024,
 };

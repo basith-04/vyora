@@ -43,7 +43,6 @@ export function buildRegistrationSubmission(form) {
     hostel: form.isHosteller ? form.hostel : null,
     needsStay: form.isHosteller ? false : form.needsStay,
     stayType: !form.isHosteller && form.needsStay ? form.stayType : null,
-    ...calculateFees(form),
   };
 }
 

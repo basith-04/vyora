@@ -8,6 +8,14 @@ import {
   updateRegistrationField,
   validateRegistration,
 } from './registrationValidation.js';
+import { createRecoveryToken, registrationApi } from './registrationApi.js';
+import { openRazorpayCheckout } from './razorpayCheckout.js';
+import {
+  canRetryPayment,
+  FLOW_PHASE,
+  isBusyPhase,
+  phaseForApiError,
+} from './registrationFlow.js';
 import './registration.css';
 
 const steps = [
@@ -72,7 +80,7 @@ function WorkshopSection({ form, update, blur, errorFor, refs }) {
 
 function FeesSection({ form, fees }) {
   const prompt = fees.baseFee === null ? 'SELECT IEEE STATUS FIRST' : fees.totalFee === null ? 'COMPLETE ACCOMMODATION DETAILS' : form.ieeeMember ? 'IEEE MEMBER' : 'NON-IEEE';
-  return <section className="registration-section" id="registration-fees" aria-labelledby="fees-heading"><SectionHeading number="04" title="FEE SUMMARY" copy="YOUR FINAL PRICE WILL BE CALCULATED BY THE SERVER." /><div className="registration-payment-grid"><div className="registration-pay-amount"><span>ESTIMATED TOTAL</span><strong>{formatFee(fees.totalFee)}</strong><small>{prompt}</small>{fees.totalFee !== null && <dl className="registration-pay-breakdown"><div><dt>REGISTRATION</dt><dd>{formatFee(fees.baseFee)}</dd></div><div><dt>STAY</dt><dd>{formatFee(fees.stayFee)}</dd></div><div className="registration-pay-total"><dt>TOTAL</dt><dd>{formatFee(fees.totalFee)}</dd></div></dl>}</div></div><p className="registration-payment-note">PAYMENT CHECKOUT IS NOT ENABLED IN PHASE 1. NO SCREENSHOT OR MANUAL UPI PROOF IS ACCEPTED.</p></section>;
+  return <section className="registration-section" id="registration-fees" aria-labelledby="fees-heading"><SectionHeading number="04" title="FEE SUMMARY" copy="YOUR FINAL PRICE WILL BE CALCULATED BY THE SERVER." /><div className="registration-payment-grid"><div className="registration-pay-amount"><span>ESTIMATED TOTAL</span><strong>{formatFee(fees.totalFee)}</strong><small>{prompt}</small>{fees.totalFee !== null && <dl className="registration-pay-breakdown"><div><dt>REGISTRATION</dt><dd>{formatFee(fees.baseFee)}</dd></div><div><dt>STAY</dt><dd>{formatFee(fees.stayFee)}</dd></div><div className="registration-pay-total"><dt>TOTAL</dt><dd>{formatFee(fees.totalFee)}</dd></div></dl>}</div></div><p className="registration-payment-note">THE SERVER WILL RESERVE YOUR SEAT FOR FIVE MINUTES AND OPEN SECURE RAZORPAY CHECKOUT.</p></section>;
 }
 
 function ReviewRow({ label, value }) {
@@ -81,29 +89,48 @@ function ReviewRow({ label, value }) {
 
 function ReviewSection({ form, fees, workshop, year, onEdit, loading }) {
   const hostel = hostels.find((item) => item.id === form.hostel);
-  return <section className="registration-section registration-review-section" id="registration-review" aria-labelledby="review-heading"><SectionHeading number="05" title="REVIEW" copy="CHECK YOUR DETAILS BEFORE CONTINUING." /><div className="registration-review-window"><div className="registration-review-bar"><span>PARTICIPANT DATA / REVIEW</span><span aria-hidden="true">− □ ×</span></div><dl><ReviewRow label="FULL NAME" value={form.fullName.trim()} /><ReviewRow label="EMAIL" value={form.email.trim()} /><ReviewRow label="PHONE" value={form.phone ? `+91 ${normalizePhone(form.phone)}` : ''} /><ReviewRow label="YEAR" value={year?.label} /><ReviewRow label="HOSTELLER" value={form.isHosteller === null ? '' : form.isHosteller ? 'YES' : 'NO'} />{form.isHosteller === true && <ReviewRow label="HOSTEL" value={hostel?.label} />}{form.isHosteller === false && <ReviewRow label="NEED STAY" value={form.needsStay === null ? '' : form.needsStay ? 'YES' : 'NO'} />}{form.needsStay === true && <ReviewRow label="STAY TYPE" value={form.stayType?.replace('_', '-')} />}<ReviewRow label="IEEE STATUS" value={form.ieeeMember === null ? '' : form.ieeeMember ? 'IEEE MEMBER' : 'NON-IEEE'} />{form.ieeeMember === true && <ReviewRow label="IEEE MEMBERSHIP ID" value={form.ieeeMembershipId.trim()} />}<ReviewRow label="AIDEX WORKSHOP" value={workshop?.title} /><ReviewRow label="ESTIMATED TOTAL" value={fees.totalFee === null ? '' : formatFee(fees.totalFee)} /></dl><div className="registration-review-edit"><button type="button" onClick={() => onEdit('registration-details', 'fullName')}>EDIT DETAILS ↗</button><button type="button" onClick={() => onEdit('registration-ieee', 'ieeeMember')}>REVIEW FEES ↗</button></div></div><button className="registration-submit" type="submit" disabled={loading}>VALIDATE DETAILS <span aria-hidden="true">→</span></button><p className="registration-submit-note">THIS PHASE DOES NOT CREATE A LIVE REGISTRATION OR COLLECT PAYMENT.</p></section>;
+  return <section className="registration-section registration-review-section" id="registration-review" aria-labelledby="review-heading"><SectionHeading number="05" title="REVIEW" copy="CHECK YOUR DETAILS BEFORE CONTINUING." /><div className="registration-review-window"><div className="registration-review-bar"><span>PARTICIPANT DATA / REVIEW</span><span aria-hidden="true">− □ ×</span></div><dl><ReviewRow label="FULL NAME" value={form.fullName.trim()} /><ReviewRow label="EMAIL" value={form.email.trim()} /><ReviewRow label="PHONE" value={form.phone ? `+91 ${normalizePhone(form.phone)}` : ''} /><ReviewRow label="YEAR" value={year?.label} /><ReviewRow label="HOSTELLER" value={form.isHosteller === null ? '' : form.isHosteller ? 'YES' : 'NO'} />{form.isHosteller === true && <ReviewRow label="HOSTEL" value={hostel?.label} />}{form.isHosteller === false && <ReviewRow label="NEED STAY" value={form.needsStay === null ? '' : form.needsStay ? 'YES' : 'NO'} />}{form.needsStay === true && <ReviewRow label="STAY TYPE" value={form.stayType?.replace('_', '-')} />}<ReviewRow label="IEEE STATUS" value={form.ieeeMember === null ? '' : form.ieeeMember ? 'IEEE MEMBER' : 'NON-IEEE'} />{form.ieeeMember === true && <ReviewRow label="IEEE MEMBERSHIP ID" value={form.ieeeMembershipId.trim()} />}<ReviewRow label="AIDEX WORKSHOP" value={workshop?.title} /><ReviewRow label="ESTIMATED TOTAL" value={fees.totalFee === null ? '' : formatFee(fees.totalFee)} /></dl><div className="registration-review-edit"><button type="button" onClick={() => onEdit('registration-details', 'fullName')}>EDIT DETAILS ↗</button><button type="button" onClick={() => onEdit('registration-ieee', 'ieeeMember')}>REVIEW FEES ↗</button></div></div><button className="registration-submit" type="submit" disabled={loading}>{loading ? 'RESERVING SEAT...' : 'RESERVE & PAY'} <span aria-hidden="true">→</span></button><p className="registration-submit-note">YOUR SEAT IS RESERVED ONLY AFTER THE SERVER ACCEPTS THIS FORM.</p></section>;
 }
 
 function RegistrationStatus({ fees, workshop, completion }) {
   return <aside className="registration-sidebar" aria-label="Registration status"><div className="registration-sidebar-bar">// REGISTRATION STATUS <span aria-hidden="true">□ ×</span></div><div className="registration-sidebar-body"><span>ESTIMATED FEE</span><strong>{formatFee(fees.totalFee)}</strong><small>{fees.totalFee === null ? 'COMPLETE REQUIRED DETAILS' : 'SERVER WILL VERIFY'}</small><span>AIDEX PATH</span><b>{workshop?.title || 'NOT SELECTED'}</b><span>PAYMENT</span><b>NOT STARTED</b><span>COMPLETION</span><b>{completion} / 5</b></div></aside>;
 }
 
-function Initializing({ progress }) {
-  const lines = ['PARTICIPANT DATA ........ READY', 'AIDEX PATH .............. READY', 'FEE ESTIMATE ............ READY'];
-  return <div className="registration-terminal registration-initializing" role="status" aria-live="polite"><span>// VALIDATION.EXE</span><h1>CHECKING<br />DETAILS...</h1><div className="registration-loading-track"><span style={{ width: `${progress * 25}%` }} /></div><strong>{progress * 25}%</strong><div className="registration-loading-lines">{lines.slice(0, Math.min(progress, 3)).map((line) => <p key={line}>{line}</p>)}</div></div>;
+const stateCopy = {
+  [FLOW_PHASE.reserving]: ['RESERVING SEAT...', 'The server is validating your details and reserving capacity.'],
+  [FLOW_PHASE.paymentPending]: ['PAYMENT PENDING', 'Your seat is reserved. Complete payment before the timer expires.'],
+  [FLOW_PHASE.paymentFailed]: ['PAYMENT FAILED', 'No confirmation was created. You can retry the same order while your reservation is active.'],
+  [FLOW_PHASE.verifying]: ['VERIFYING PAYMENT...', 'Payment was returned by Checkout. Waiting for trusted backend verification.'],
+  [FLOW_PHASE.verificationFailed]: ['PAYMENT VERIFICATION FAILED', 'The payment could not be confirmed automatically. Retry status recovery or contact the organizers if you were charged.'],
+  [FLOW_PHASE.networkError]: ['NETWORK ERROR', 'The result could not be retrieved. Your reservation and payment state remain on the server.'],
+  [FLOW_PHASE.expired]: ['RESERVATION EXPIRED', 'This seat was released. Begin a fresh registration attempt before paying again.'],
+  [FLOW_PHASE.reconciliation]: ['PAYMENT REQUIRES RECONCILIATION', 'Payment was received after the reservation could be confirmed. The organizers must review it; no extra seat was created.'],
+  [FLOW_PHASE.confirmed]: ['REGISTRATION CONFIRMED', 'Your payment was verified by the backend and your reserved seat is confirmed.'],
+};
+
+function formatCountdown(seconds) {
+  const safe = Math.max(0, seconds);
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
 }
 
-function Ready({ submission, workshop }) {
-  return <div className="registration-terminal registration-success" role="status" aria-live="polite"><span>// DETAILS VALIDATED</span><div className="registration-success-mark" aria-hidden="true">✓</div><h1>DETAILS<br />READY.</h1><div className="registration-success-grid"><div><span>REGISTRATION</span><strong>NOT CREATED</strong></div><div><span>PAYMENT</span><strong className="registration-pending">● NOT STARTED</strong></div><div><span>AIDEX PATH</span><strong>{workshop?.title}</strong></div><div><span>ESTIMATED FEE</span><strong>{formatFee(submission.totalFee)}</strong></div></div><p>The Phase 1 frontend is intentionally not connected to payment or live registration creation.</p><p>Checkout and registration submission will be enabled with Razorpay in Phase 2.</p><div className="registration-success-actions"><a href="/">BACK TO HOME →</a><a href="/registration">EDIT DETAILS →</a></div></div>;
+function PaymentState({ phase, reservation, remainingSeconds, message, onRetry, onFresh }) {
+  const [title, copy] = stateCopy[phase] ?? ['REGISTRATION ERROR', message || 'The request could not be completed.'];
+  const confirmed = phase === FLOW_PHASE.confirmed;
+  return <div className={`registration-terminal registration-success registration-payment-state state-${phase}`} role="status" aria-live="polite"><span>// PAYMENT.EXE</span>{confirmed && <div className="registration-success-mark" aria-hidden="true">✓</div>}<h1>{title}</h1><p>{message || copy}</p>{reservation && <div className="registration-success-grid"><div><span>REGISTRATION</span><strong>{reservation.registrationId}</strong></div><div><span>SERVER STATUS</span><strong>{reservation.registrationStatus}</strong></div><div><span>AUTHORITATIVE TOTAL</span><strong>{formatFee(reservation.pricing?.totalFee)}</strong></div><div><span>RESERVATION TIMER</span><strong className="registration-pending">{formatCountdown(remainingSeconds)}</strong></div></div>}{canRetryPayment(phase, remainingSeconds) && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>OPEN CHECKOUT AGAIN <span aria-hidden="true">→</span></button>}{phase === FLOW_PHASE.paymentFailed && !reservation && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>TRY AGAIN <span aria-hidden="true">→</span></button>}{[FLOW_PHASE.expired, FLOW_PHASE.paymentFailed, FLOW_PHASE.networkError].includes(phase) && <button className="registration-secondary-action" type="button" onClick={onFresh}>START A FRESH ATTEMPT</button>}<div className="registration-success-actions"><a href="/">BACK TO HOME →</a></div></div>;
 }
+
+const SESSION_KEY = 'vyora26.registration.recovery';
 
 export default function RegistrationPage() {
   const [form, setForm] = useState(initialRegistration);
   const [touched, setTouched] = useState({});
   const [attempted, setAttempted] = useState(false);
-  const [phase, setPhase] = useState('form');
-  const [progress, setProgress] = useState(0);
-  const [submittedRegistration, setSubmittedRegistration] = useState(null);
+  const [phase, setPhase] = useState(FLOW_PHASE.form);
+  const [reservation, setReservation] = useState(null);
+  const [flowMessage, setFlowMessage] = useState('');
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const recoveryToken = useRef(null);
+  const submissionInFlight = useRef(false);
   const refs = {
     fullName: useRef(null), email: useRef(null), phone: useRef(null), year: useRef(null),
     isHosteller: useRef(null), hostel: useRef(null), needsStay: useRef(null), stayType: useRef(null),
@@ -129,9 +156,59 @@ export default function RegistrationPage() {
   const blur = (field) => setTouched((previous) => ({ ...previous, [field]: true }));
   const errorFor = (field) => attempted || touched[field] ? errors[field] : '';
   const onEdit = (id, field) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.setTimeout(() => refs[field].current?.focus(), 250); };
-  const onSubmit = (event) => {
+  const saveRecovery = (registrationId, token) => {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ registrationId, token }));
+  };
+  const applyReservation = (data, token) => {
+    setReservation(data);
+    saveRecovery(data.registrationId, token);
+    setRemainingSeconds(Math.max(0, Math.ceil((Date.parse(data.seatReservationExpiresAt) - Date.now()) / 1000)));
+  };
+  const runCheckout = async (data, token) => {
+    if (!data.checkout || Date.parse(data.seatReservationExpiresAt) <= Date.now()) {
+      setPhase(FLOW_PHASE.expired);
+      return;
+    }
+    setPhase(FLOW_PHASE.paymentPending);
+    setFlowMessage('');
+    let checkoutResult;
+    try {
+      checkoutResult = await openRazorpayCheckout(data.checkout);
+    } catch (error) {
+      setFlowMessage(error.message);
+      setPhase(FLOW_PHASE.networkError);
+      return;
+    }
+    if (checkoutResult.type === 'closed') {
+      setFlowMessage('Checkout was closed. Your reservation remains active until the timer expires.');
+      setPhase(FLOW_PHASE.paymentPending);
+      return;
+    }
+    if (checkoutResult.type === 'failed') {
+      setFlowMessage('Razorpay reported that this payment attempt failed. No registration was confirmed.');
+      setPhase(FLOW_PHASE.paymentFailed);
+      return;
+    }
+    setPhase(FLOW_PHASE.verifying);
+    try {
+      const verified = await registrationApi.verify({
+        registrationId: data.registrationId,
+        razorpayOrderId: checkoutResult.response.razorpay_order_id,
+        razorpayPaymentId: checkoutResult.response.razorpay_payment_id,
+        razorpaySignature: checkoutResult.response.razorpay_signature,
+      }, token);
+      setReservation((previous) => ({ ...previous, ...verified }));
+      sessionStorage.removeItem(SESSION_KEY);
+      setPhase(FLOW_PHASE.confirmed);
+      setFlowMessage('');
+    } catch (error) {
+      setFlowMessage(error.message);
+      setPhase(phaseForApiError(error));
+    }
+  };
+  const onSubmit = async (event) => {
     event.preventDefault();
-    if (phase !== 'form') return;
+    if (phase !== FLOW_PHASE.form || isBusyPhase(phase) || submissionInFlight.current) return;
     setAttempted(true);
     const firstError = Object.keys(errors)[0];
     if (firstError) {
@@ -141,20 +218,90 @@ export default function RegistrationPage() {
       });
       return;
     }
-    setSubmittedRegistration(buildRegistrationSubmission(form));
-    setPhase('initializing');
-    setProgress(0);
+    const token = recoveryToken.current ?? createRecoveryToken();
+    recoveryToken.current = token;
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token }));
+    submissionInFlight.current = true;
+    setPhase(FLOW_PHASE.reserving);
+    setFlowMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const data = await registrationApi.create(buildRegistrationSubmission(form), token);
+      applyReservation(data, token);
+      await runCheckout(data, token);
+    } catch (error) {
+      setFlowMessage(error.message);
+      setPhase(phaseForApiError(error));
+    } finally {
+      submissionInFlight.current = false;
+    }
   };
 
   useEffect(() => {
-    if (phase !== 'initializing') return undefined;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const delay = reduced ? 70 : 300;
-    const timers = [1, 2, 3, 4].map((step) => window.setTimeout(() => setProgress(step), step * delay));
-    timers.push(window.setTimeout(() => setPhase('ready'), reduced ? 350 : 1500));
-    return () => timers.forEach(window.clearTimeout);
-  }, [phase]);
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch { saved = null; }
+    if (!saved?.token) return undefined;
+    recoveryToken.current = saved.token;
+    setPhase(FLOW_PHASE.reserving);
+    registrationApi.status(saved.registrationId, saved.token).then((data) => {
+      applyReservation(data, saved.token);
+      if (data.registrationStatus === 'CONFIRMED') {
+        sessionStorage.removeItem(SESSION_KEY);
+        setPhase(FLOW_PHASE.confirmed);
+      } else if (data.registrationStatus === 'EXPIRED') {
+        setPhase(FLOW_PHASE.expired);
+      } else {
+        setPhase(FLOW_PHASE.paymentPending);
+      }
+    }).catch((error) => {
+      setFlowMessage(error.message);
+      setPhase(phaseForApiError(error));
+    });
+    return undefined;
+  }, []);
 
-  return <main className="registration-page" id="main-content"><div className="registration-container">{phase === 'ready' ? <Ready submission={submittedRegistration} workshop={workshop} /> : phase === 'initializing' ? <Initializing progress={progress} /> : <><RegistrationHero /><Progress current={current} complete={complete} /><div className="registration-layout"><form className="registration-form" noValidate onSubmit={onSubmit}><ParticipantSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><IeeeSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} fee={fees.baseFee} /><WorkshopSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><FeesSection form={form} fees={fees} /><ReviewSection form={form} fees={fees} workshop={workshop} year={year} onEdit={onEdit} loading={false} /></form><RegistrationStatus fees={fees} workshop={workshop} completion={completion} /></div></>}</div></main>;
+  useEffect(() => {
+    if (!reservation?.seatReservationExpiresAt || phase === FLOW_PHASE.confirmed) return undefined;
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((Date.parse(reservation.seatReservationExpiresAt) - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+      if (remaining === 0 && ![FLOW_PHASE.confirmed, FLOW_PHASE.reconciliation, FLOW_PHASE.verifying].includes(phase)) {
+        setPhase(FLOW_PHASE.expired);
+      }
+    };
+    updateTimer();
+    const timer = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(timer);
+  }, [reservation?.seatReservationExpiresAt, phase]);
+
+  const retry = async () => {
+    if (isBusyPhase(phase) || submissionInFlight.current) return;
+    const token = recoveryToken.current;
+    if (!token) return;
+    submissionInFlight.current = true;
+    setPhase(FLOW_PHASE.reserving);
+    setFlowMessage('');
+    try {
+      const data = reservation
+        ? await registrationApi.retry(reservation.registrationId, token)
+        : await registrationApi.create(buildRegistrationSubmission(form), token);
+      applyReservation(data, token);
+      await runCheckout(data, token);
+    } catch (error) {
+      setFlowMessage(error.message);
+      setPhase(phaseForApiError(error));
+    } finally {
+      submissionInFlight.current = false;
+    }
+  };
+  const freshAttempt = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    recoveryToken.current = null;
+    setReservation(null);
+    setFlowMessage('');
+    setPhase(FLOW_PHASE.form);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return <main className="registration-page" id="main-content"><div className="registration-container">{phase !== FLOW_PHASE.form ? <PaymentState phase={phase} reservation={reservation} remainingSeconds={remainingSeconds} message={flowMessage} onRetry={retry} onFresh={freshAttempt} /> : <><RegistrationHero /><Progress current={current} complete={complete} /><div className="registration-layout"><form className="registration-form" noValidate onSubmit={onSubmit}><ParticipantSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><IeeeSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} fee={fees.baseFee} /><WorkshopSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><FeesSection form={form} fees={fees} /><ReviewSection form={form} fees={fees} workshop={workshop} year={year} onEdit={onEdit} loading={isBusyPhase(phase)} /></form><RegistrationStatus fees={fees} workshop={workshop} completion={completion} /></div></>}</div></main>;
 }

@@ -84,8 +84,13 @@ test('requires only the visible accommodation path and clears stale selections',
     stayType: 'NON_AC',
     email: 'test@example.com',
     hostel: null,
-    baseFee: 799,
-    stayFee: 250,
-    totalFee: 1049,
   });
+});
+
+test('submission excludes all client-calculated authoritative prices', () => {
+  const submission = buildRegistrationSubmission(valid);
+  assert.equal('baseFee' in submission, false);
+  assert.equal('stayFee' in submission, false);
+  assert.equal('totalFee' in submission, false);
+  assert.equal('paymentStatus' in submission, false);
 });

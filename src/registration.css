@@ -135,6 +135,10 @@
 .registration-success-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 9px 13px; border: 1px solid var(--vyora-orange); text-decoration: none; color: var(--vyora-cream); font: 700 11px var(--font-technical); }
 .registration-success-actions a:first-child { background: var(--vyora-orange); color: var(--vyora-navy); }
 .registration-success > small { color: #81a7a8; font: 500 9px/1.4 var(--font-technical); }
+.registration-payment-state h1 { max-width: 15ch; overflow-wrap: anywhere; }
+.registration-payment-state .registration-submit { width: min(100%,34rem); margin-top: 1.5rem; }
+.registration-secondary-action { display: block; margin: 1rem 0 0; padding: .8rem 1rem; border: 1px solid currentColor; border-radius: 0; background: transparent; color: inherit; cursor: pointer; font: 700 11px var(--font-technical); }
+.state-expired .registration-pending, .state-payment_failed .registration-pending, .state-verification_failed .registration-pending, .state-reconciliation .registration-pending { color: #ff6347; }
 .registration-sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
 
 @media (min-width: 700px) {

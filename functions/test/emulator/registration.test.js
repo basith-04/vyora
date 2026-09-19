@@ -31,6 +31,12 @@ const valid = {
   workshopId: 'github-ai',
 };
 
+const tokenA = 'a'.repeat(64);
+const tokenB = 'b'.repeat(64);
+const register = (create, input, recoveryTokenHash = tokenA) => (
+  create(input, { recoveryTokenHash })
+);
+
 async function seed(overrides = {}) {
   const now = Timestamp.now();
   const capacity = { ...DEFAULT_CONFIGURATION.capacity, ...overrides.capacity, updatedAt: now };
@@ -80,25 +86,25 @@ after(async () => {
 test('reserves the final event seat and then returns EVENT_FULL', async () => {
   await seed({ capacity: { eventOccupied: 164 } });
   const create = createRegistrationService({ db });
-  await create(valid);
-  await rejectCode(create({ ...valid, email: 'other@example.com', phone: '9876543211' }), 'EVENT_FULL');
+  await register(create, valid);
+  await rejectCode(register(create, { ...valid, email: 'other@example.com', phone: '9876543211' }), 'EVENT_FULL');
   assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 165);
 });
 
 test('reserves the final workshop seat and then returns WORKSHOP_FULL', async () => {
   await seed({ workshops: { 'github-ai': { occupied: 54 } } });
   const create = createRegistrationService({ db });
-  await create(valid);
-  await rejectCode(create({ ...valid, email: 'other@example.com', phone: '9876543211' }), 'WORKSHOP_FULL');
+  await register(create, valid);
+  await rejectCode(register(create, { ...valid, email: 'other@example.com', phone: '9876543211' }), 'WORKSHOP_FULL');
   assert.equal((await db.doc('workshops/github-ai').get()).data().occupied, 55);
 });
 
 test('reserves the final first-year seat and allows a later-year registration', async () => {
   await seed({ capacity: { firstYearOccupied: 54 } });
   const create = createRegistrationService({ db });
-  await create({ ...valid, year: 1 });
-  await rejectCode(create({ ...valid, email: 'first@example.com', phone: '9876543211', year: 1 }), 'FIRST_YEAR_FULL');
-  await create({ ...valid, email: 'second@example.com', phone: '9876543212', year: 2 });
+  await register(create, { ...valid, year: 1 });
+  await rejectCode(register(create, { ...valid, email: 'first@example.com', phone: '9876543211', year: 1 }), 'FIRST_YEAR_FULL');
+  await register(create, { ...valid, email: 'second@example.com', phone: '9876543212', year: 2 });
   const capacity = (await db.doc('system/capacity').get()).data();
   assert.equal(capacity.firstYearOccupied, 55);
   assert.equal(capacity.eventOccupied, 2);
@@ -108,8 +114,8 @@ test('two concurrent requests cannot take one remaining workshop seat', async ()
   await seed({ workshops: { 'github-ai': { occupied: 54 } } });
   const create = createRegistrationService({ db });
   const results = await Promise.allSettled([
-    create({ ...valid, email: 'a@example.com', phone: '9876543211' }),
-    create({ ...valid, email: 'b@example.com', phone: '9876543212' }),
+    register(create, { ...valid, email: 'a@example.com', phone: '9876543211' }),
+    register(create, { ...valid, email: 'b@example.com', phone: '9876543212' }),
   ]);
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
   assert.equal(results.filter((result) => result.status === 'rejected' && result.reason.code === 'WORKSHOP_FULL').length, 1);
@@ -120,8 +126,8 @@ test('two concurrent first-year requests cannot take one remaining first-year se
   await seed({ capacity: { firstYearOccupied: 54 } });
   const create = createRegistrationService({ db });
   const results = await Promise.allSettled([
-    create({ ...valid, year: 1, email: 'a@example.com', phone: '9876543211' }),
-    create({ ...valid, year: 1, email: 'b@example.com', phone: '9876543212' }),
+    register(create, { ...valid, year: 1, email: 'a@example.com', phone: '9876543211' }),
+    register(create, { ...valid, year: 1, email: 'b@example.com', phone: '9876543212' }),
   ]);
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
   assert.equal(results.filter((result) => result.status === 'rejected' && result.reason.code === 'FIRST_YEAR_FULL').length, 1);
@@ -131,7 +137,10 @@ test('two concurrent first-year requests cannot take one remaining first-year se
 test('simultaneous duplicate attempts create only one active reservation', async () => {
   await seed();
   const create = createRegistrationService({ db });
-  const results = await Promise.allSettled([create(valid), create(valid)]);
+  const results = await Promise.allSettled([
+    register(create, valid, tokenA),
+    register(create, valid, tokenB),
+  ]);
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
   assert.equal(results.filter((result) => result.status === 'rejected' && result.reason.code === 'DUPLICATE_REGISTRATION').length, 1);
   assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 1);
@@ -143,7 +152,7 @@ test('expiration releases capacity once and permits a new attempt', async () => 
   await seed();
   const creationTime = 1_800_000_000_000;
   const createExpired = createRegistrationService({ db, clock: () => creationTime });
-  const first = await createExpired({ ...valid, year: 1 });
+  const first = await register(createExpired, { ...valid, year: 1 });
   const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
 
   assert.deepEqual(await expiration.expireRegistration(first.registrationDocId), { outcome: 'EXPIRED' });
@@ -159,7 +168,7 @@ test('expiration releases capacity once and permits a new attempt', async () => 
   assert.equal((await db.collection('registrationLocks').get()).size, 0);
 
   const createAgain = createRegistrationService({ db, clock: () => creationTime + 302_000 });
-  await createAgain({ ...valid, year: 1 });
+  await register(createAgain, { ...valid, year: 1 });
   capacity = (await db.doc('system/capacity').get()).data();
   assert.equal(capacity.eventOccupied, 1);
   assert.equal(capacity.firstYearOccupied, 1);
@@ -169,7 +178,7 @@ test('expiration sweep evaluates the stored deadline and remains idempotent', as
   await seed();
   const creationTime = 1_800_000_000_000;
   const create = createRegistrationService({ db, clock: () => creationTime });
-  await create(valid);
+  await register(create, valid);
   const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
   assert.deepEqual(await expiration.expirePendingReservations(), { examined: 1, expired: 1 });
   assert.deepEqual(await expiration.expirePendingReservations(), { examined: 0, expired: 0 });

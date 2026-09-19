@@ -2,35 +2,47 @@ import { hostels, registrationOptions, workshops, years } from './registrationOp
 
 export const initialRegistration = {
   fullName: '', email: '', phone: '', year: '', ieeeMember: null,
-  ieeeId: '', isHosteller: null, hostel: '', needsStay: null,
-  workshop: '', paymentProof: null,
+  ieeeMembershipId: '', isHosteller: null, hostel: null, needsStay: null,
+  stayType: null, workshopId: '',
 };
 
 export function updateRegistrationField(form, field, value) {
   return {
     ...form,
     [field]: value,
-    ...(field === 'ieeeMember' && value === false ? { ieeeId: '' } : {}),
-    ...(field === 'isHosteller' ? { hostel: '', needsStay: null } : {}),
+    ...(field === 'ieeeMember' && value === false ? { ieeeMembershipId: null } : {}),
+    ...(field === 'ieeeMember' && value === true ? { ieeeMembershipId: '' } : {}),
+    ...(field === 'isHosteller' && value === true ? { hostel: null, needsStay: false, stayType: null } : {}),
+    ...(field === 'isHosteller' && value === false ? { hostel: null, needsStay: null, stayType: null } : {}),
+    ...(field === 'needsStay' && value === false ? { stayType: null } : {}),
   };
 }
 
 export function calculateFees(form) {
   const baseFee = form.ieeeMember === null ? null : form.ieeeMember ? registrationOptions.prices.ieee : registrationOptions.prices.nonIeee;
-  const stayFee = form.isHosteller === false && form.needsStay === true ? registrationOptions.stayFee : 0;
-  const accommodationChosen = form.isHosteller === true || (form.isHosteller === false && form.needsStay !== null);
-  return { baseFee, stayFee, totalFee: baseFee !== null && accommodationChosen ? baseFee + stayFee : null };
+  const stayFee = form.isHosteller === false && form.needsStay === true
+    ? form.stayType === 'AC'
+      ? registrationOptions.accommodation.ac
+      : form.stayType === 'NON_AC'
+        ? registrationOptions.accommodation.nonAc
+        : null
+    : 0;
+  const accommodationChosen = form.isHosteller === true
+    || (form.isHosteller === false && form.needsStay === false)
+    || (form.isHosteller === false && form.needsStay === true && stayFee !== null);
+  return { baseFee, stayFee: stayFee ?? 0, totalFee: baseFee !== null && accommodationChosen ? baseFee + (stayFee ?? 0) : null };
 }
 
 export function buildRegistrationSubmission(form) {
   return {
     ...form,
     fullName: form.fullName.trim(),
-    email: form.email.trim(),
     phone: normalizePhone(form.phone),
-    ieeeId: form.ieeeMember ? form.ieeeId.trim() : '',
+    email: form.email.trim().toLowerCase(),
+    ieeeMembershipId: form.ieeeMember ? form.ieeeMembershipId.trim() : null,
     hostel: form.isHosteller ? form.hostel : null,
-    needsStay: form.isHosteller ? null : form.needsStay,
+    needsStay: form.isHosteller ? false : form.needsStay,
+    stayType: !form.isHosteller && form.needsStay ? form.stayType : null,
     ...calculateFees(form),
   };
 }
@@ -42,15 +54,6 @@ export function normalizePhone(value) {
   return digits.slice(0, 10);
 }
 
-export function paymentProofError(file) {
-  if (!file) return 'UPLOAD YOUR PAYMENT SCREENSHOT.';
-  const accepted = ['image/jpeg', 'image/png', 'image/webp'];
-  const validExtension = /\.(jpe?g|png|webp)$/i.test(file.name);
-  if (!accepted.includes(file.type) && !(file.type === '' && validExtension)) return 'USE A JPG, PNG, OR WEBP IMAGE.';
-  if (file.size > registrationOptions.maxPaymentProofBytes) return 'IMAGE MUST BE 5 MB OR SMALLER.';
-  return '';
-}
-
 export function validateRegistration(form) {
   const errors = {};
   if (!form.fullName.trim()) errors.fullName = 'ENTER YOUR FULL NAME.';
@@ -58,12 +61,11 @@ export function validateRegistration(form) {
   if (!/^\d{10}$/.test(normalizePhone(form.phone))) errors.phone = 'ENTER A 10-DIGIT MOBILE NUMBER.';
   if (!years.some((year) => year.id === form.year)) errors.year = 'SELECT YOUR YEAR OF STUDY.';
   if (form.isHosteller === null) errors.isHosteller = 'SELECT YOUR HOSTELLER STATUS.';
-  if (form.isHosteller === true && !hostels.includes(form.hostel)) errors.hostel = 'SELECT YOUR HOSTEL.';
+  if (form.isHosteller === true && !hostels.some((hostel) => hostel.id === form.hostel)) errors.hostel = 'SELECT YOUR HOSTEL.';
   if (form.isHosteller === false && form.needsStay === null) errors.needsStay = 'SELECT IF YOU NEED STAY.';
+  if (form.isHosteller === false && form.needsStay === true && !['AC', 'NON_AC'].includes(form.stayType)) errors.stayType = 'SELECT AC OR NON-AC STAY.';
   if (form.ieeeMember === null) errors.ieeeMember = 'SELECT YOUR IEEE STATUS.';
-  if (form.ieeeMember === true && !form.ieeeId.trim()) errors.ieeeId = 'IEEE MEMBERSHIP ID IS REQUIRED.';
-  if (!workshops.some((workshop) => workshop.id === form.workshop)) errors.workshop = 'SELECT ONE AIDEX WORKSHOP.';
-  const proofError = paymentProofError(form.paymentProof);
-  if (proofError) errors.paymentProof = proofError;
+  if (form.ieeeMember === true && !form.ieeeMembershipId.trim()) errors.ieeeMembershipId = 'IEEE MEMBERSHIP ID IS REQUIRED.';
+  if (!workshops.some((workshop) => workshop.id === form.workshopId)) errors.workshopId = 'SELECT ONE AIDEX WORKSHOP.';
   return errors;
 }

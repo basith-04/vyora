@@ -1,20 +1,24 @@
 export const registrationOptions = {
   prices: { ieee: 399, nonIeee: 799 },
-  stayFee: 200,
-  maxPaymentProofBytes: 5 * 1024 * 1024,
+  accommodation: { nonAc: 250, ac: 300 },
 };
 
-export const hostels = ['Sanjose', 'Santhome', 'Holy Cross', 'Alphonsa'];
+export const hostels = [
+  { id: 'SANJOSE', label: 'Sanjose' },
+  { id: 'SANTHOME', label: 'Santhome' },
+  { id: 'HOLY_CROSS', label: 'Holy Cross' },
+  { id: 'ALPHONSA', label: 'Alphonsa' },
+];
 
 export const workshops = [
-  { id: 'data-science-python', number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', accent: 'orange' },
+  { id: 'data-science', number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', accent: 'orange' },
   { id: 'ai-ml-data', number: '02', title: 'AI / ML / DATA', accent: 'blue' },
   { id: 'github-ai', number: '03', title: 'GITHUB × AI', accent: 'green' },
 ];
 
 export const years = [
-  { id: 'first', number: '01', label: 'FIRST YEAR' },
-  { id: 'second', number: '02', label: 'SECOND YEAR' },
-  { id: 'third', number: '03', label: 'THIRD YEAR' },
-  { id: 'fourth', number: '04', label: 'FOURTH YEAR' },
+  { id: 1, number: '01', label: 'FIRST YEAR' },
+  { id: 2, number: '02', label: 'SECOND YEAR' },
+  { id: 3, number: '03', label: 'THIRD YEAR' },
+  { id: 4, number: '04', label: 'FOURTH YEAR' },
 ];

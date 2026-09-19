@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "registrations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "registrationStatus", "order": "ASCENDING" },
+        { "fieldPath": "capacityReleased", "order": "ASCENDING" },
+        { "fieldPath": "seatReservationExpiresAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

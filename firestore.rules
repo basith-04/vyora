@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All Phase 1 authoritative data is accessible only through Cloud Functions
+    // using the Admin SDK. Admin SDK requests bypass these client rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

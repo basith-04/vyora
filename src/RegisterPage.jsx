@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import landscape from '../assets/egister-vjec-landscape-strip.png';
 import adventurer from '../assets/vyora-adventurer-standing.png';
-import { registrationConfig } from './registrationConfig.js';
+import { registrationOptions } from './registrationOptions.js';
 import './register.css';
 
 const tiers = [
-  { id: 'ieee', label: 'IEEE MEMBER', lines: ['IEEE MEMBER', 'STANDARD'], price: registrationConfig.prices.ieee },
-  { id: 'non-ieee', label: 'NON-IEEE', lines: ['STANDARD', 'NON-IEEE'], price: registrationConfig.prices.nonIeee },
+  { id: 'ieee', label: 'IEEE MEMBER', lines: ['IEEE MEMBER', 'STANDARD'], price: registrationOptions.prices.ieee },
+  { id: 'non-ieee', label: 'NON-IEEE', lines: ['STANDARD', 'NON-IEEE'], price: registrationOptions.prices.nonIeee },
 ];
 
 function MemberIcon() {

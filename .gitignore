@@ -1,3 +1,11 @@
 node_modules/
 dist/
 .DS_Store
+firebase-debug.log
+firebase-debug.*.log
+.env.local
+.env.*.local
+firestore-debug.log
+ui-debug.log
+.secret.local
+functions/.secret.local

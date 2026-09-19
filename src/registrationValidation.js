@@ -57,11 +57,11 @@ export function validateRegistration(form) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = 'ENTER A VALID EMAIL ADDRESS.';
   if (!/^\d{10}$/.test(normalizePhone(form.phone))) errors.phone = 'ENTER A 10-DIGIT MOBILE NUMBER.';
   if (!years.some((year) => year.id === form.year)) errors.year = 'SELECT YOUR YEAR OF STUDY.';
-  if (form.ieeeMember === null) errors.ieeeMember = 'SELECT YOUR IEEE STATUS.';
-  if (form.ieeeMember === true && !form.ieeeId.trim()) errors.ieeeId = 'IEEE MEMBERSHIP ID IS REQUIRED.';
   if (form.isHosteller === null) errors.isHosteller = 'SELECT YOUR HOSTELLER STATUS.';
   if (form.isHosteller === true && !hostels.includes(form.hostel)) errors.hostel = 'SELECT YOUR HOSTEL.';
   if (form.isHosteller === false && form.needsStay === null) errors.needsStay = 'SELECT IF YOU NEED STAY.';
+  if (form.ieeeMember === null) errors.ieeeMember = 'SELECT YOUR IEEE STATUS.';
+  if (form.ieeeMember === true && !form.ieeeId.trim()) errors.ieeeId = 'IEEE MEMBERSHIP ID IS REQUIRED.';
   if (!workshops.some((workshop) => workshop.id === form.workshop)) errors.workshop = 'SELECT ONE AIDEX WORKSHOP.';
   const proofError = paymentProofError(form.paymentProof);
   if (proofError) errors.paymentProof = proofError;

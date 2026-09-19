@@ -28,7 +28,7 @@ const days = [
       {
         start: '9:30 AM', end: '12:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
         tracks: [
-          { number: '01', title: 'AGENTIC AI', people: 'Sreeram M R · Entri App', tone: 'orange' },
+          { number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', people: 'Sreeram M R · Entri App', tone: 'orange' },
           { number: '02', title: 'AI / ML / DATA SCIENCE', people: 'Abhinav I · Usmanul Faris K S · Abhiram M S · S7 ADS A', tone: 'blue' },
           { number: '03', title: 'GITHUB × AI', people: 'Josin Joseph · Samanway T K · S7 ADS A', tone: 'green' },
         ],

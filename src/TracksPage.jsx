@@ -97,7 +97,7 @@ function GitDiagram() {
 function TrackWindow({ track, selected, onSelect }) {
   return (
     <article id={`track-${track.number}`} className={`track-window track-window-${track.tone} ${selected ? 'is-selected' : ''}`} aria-labelledby={`track-${track.number}-title`}>
-      <div className="track-window-bar"><span className="track-window-glyph" aria-hidden="true">▶</span><span>AIDEX / {track.number}</span><span className="track-window-controls" aria-hidden="true">─ □ ×</span></div>
+      <div className="track-window-bar"><span className="track-window-glyph" aria-hidden="true">▶</span><span>AIDEXX / {track.number}</span><span className="track-window-controls" aria-hidden="true">─ □ ×</span></div>
       <div className="track-window-body">
         <div className="track-window-lead">
           <h3 id={`track-${track.number}-title`}>{track.titleLines.map((line)=><span key={line}>{line}</span>)}</h3>
@@ -137,7 +137,7 @@ export default function TracksPage() {
       <div className="tracks-top">
         <div className="tracks-heading"><p>// TRACKS.EXE</p><h1 id="tracks-heading">CHOOSE YOUR PATH.</h1></div>
         <div className="aidex-identity"><h2>AIDEXX</h2><p>ADVANCING INTELLIGENCE,<br />DEVELOPMENT, ENGAGEMENT<br />&amp; EXCELLENCE</p></div>
-        <aside className="aidex-access" aria-label="AIDEX workshop access"><strong>AIDEX WORKSHOP SERIES</strong><span>03 WORKSHOPS</span><div><b>WORKSHOP ACCESS: FREE</b><b>NO ADDITIONAL FEE</b></div></aside>
+        <aside className="aidex-access" aria-label="AIDEX workshop access"><strong>AIDEXX WORKSHOP SERIES</strong><span>03 WORKSHOPS</span><div><b>WORKSHOP ACCESS: FREE</b><b>NO ADDITIONAL FEE</b></div></aside>
       </div>
       <div className="tracks-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</div>
       <section className="tracks-modules" aria-label="AIDEX workshops">

@@ -57,7 +57,10 @@ function toTimestamp(now) {
 export function createRegistrationService({ db, clock = () => Date.now() }) {
   if (!db) throw new TypeError('A Firestore instance is required.');
 
-  return async function createRegistration(input) {
+  return async function createRegistration(input, { recoveryTokenHash } = {}) {
+    if (!/^[a-f0-9]{64}$/.test(recoveryTokenHash ?? '')) {
+      throw new AppError('INVALID_RECOVERY_TOKEN', 'A valid registration recovery token is required.', 400);
+    }
     const participant = validateAndNormalizeRegistration(input);
     const registrationRef = db.collection(COLLECTIONS.registrations).doc();
     const registrationId = publicRegistrationId(registrationRef.id);
@@ -89,7 +92,43 @@ export function createRegistrationService({ db, clock = () => Date.now() }) {
       if (config.registrationOpen !== true) {
         throw new AppError('REGISTRATION_CLOSED', 'Registration is currently closed.', 409);
       }
-      if (lockSnapshots.some((snapshot) => snapshot.exists && snapshot.data()?.status === 'ACTIVE')) {
+      const activeLocks = lockSnapshots.filter(
+        (snapshot) => snapshot.exists && snapshot.data()?.status === 'ACTIVE',
+      );
+      if (activeLocks.length > 0) {
+        const lockedDocumentIds = new Set(
+          activeLocks.map((snapshot) => snapshot.data().registrationDocId),
+        );
+        if (lockedDocumentIds.size === 1) {
+          const [lockedDocumentId] = lockedDocumentIds;
+          const lockedSnapshot = await transaction.get(
+            db.collection(COLLECTIONS.registrations).doc(lockedDocumentId),
+          );
+          const locked = lockedSnapshot.data();
+          if (
+            lockedSnapshot.exists
+            && locked.recoveryTokenHash === recoveryTokenHash
+            && locked.registrationStatus === REGISTRATION_STATUS.paymentPending
+            && locked.capacityReleased === false
+            && locked.email === participant.email
+            && locked.phone === participant.phone
+          ) {
+            return {
+              registrationDocId: lockedSnapshot.id,
+              registrationId: locked.registrationId,
+              registrationStatus: locked.registrationStatus,
+              paymentStatus: locked.paymentStatus,
+              workshopId: locked.workshopId,
+              pricing: {
+                baseFee: locked.baseFee,
+                stayFee: locked.stayFee,
+                totalFee: locked.totalFee,
+              },
+              seatReservationExpiresAt: locked.seatReservationExpiresAt,
+              reused: true,
+            };
+          }
+        }
         throw new AppError('DUPLICATE_REGISTRATION', 'An active registration already exists.', 409);
       }
       if (capacity.eventOccupied >= capacity.eventCapacity) {
@@ -119,6 +158,16 @@ export function createRegistrationService({ db, clock = () => Date.now() }) {
         registrationStatus: REGISTRATION_STATUS.paymentPending,
         seatReservationExpiresAt: expiresAt,
         capacityReleased: false,
+        recoveryTokenHash,
+        orderCreationStatus: null,
+        orderCreationAttemptId: null,
+        orderCreationUpdatedAt: null,
+        razorpayReceipt: null,
+        razorpayOrderId: null,
+        razorpayOrderAmount: null,
+        razorpayOrderCurrency: null,
+        razorpayPaymentId: null,
+        paymentReconciliationRequired: false,
         ticketIssued: false,
         ticketId: null,
         createdAt: now,

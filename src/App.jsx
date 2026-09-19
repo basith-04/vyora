@@ -8,6 +8,7 @@ import FieldPage from './FieldPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import PeoplePage from './PeoplePage.jsx';
 import RegistrationPage from './RegistrationPage.jsx';
+import AdminPage from './AdminPage.jsx';
 import { Footer, PolicyPage, informationPaths } from './InformationPages.jsx';
 import { publicSections } from './siteNavigation.js';
 
@@ -236,8 +237,9 @@ function ChapterBoundary() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
+  const isAdmin = activePath === '/admin';
   const isPolicy = informationPaths.has(activePath);
-  const isStandalone = isRegistration || isPolicy;
+  const isStandalone = isRegistration || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);
 
   useEffect(() => {
@@ -249,8 +251,10 @@ export default function App() {
       '/cancellation-and-refund': "Cancellation & Refund Policy | VYORA '26",
       '/shipping-and-delivery': "Shipping & Delivery Policy | VYORA '26",
     };
-    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : titles[activePath] || "VYORA '26 — A Brighter Tomorrow";
-  }, [activePath, isRegistration]);
+    document.title = isAdmin ? "STAFF CONSOLE — VYORA '26" : isRegistration ? "REGISTRATION.EXE — VYORA '26" : titles[activePath] || "VYORA '26 — A Brighter Tomorrow";
+  }, [activePath, isAdmin, isRegistration]);
+
+  if (isAdmin) return <AdminPage />;
 
   return (
     <div className="desktop-surround">

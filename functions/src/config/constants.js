@@ -3,6 +3,8 @@ export const COLLECTIONS = Object.freeze({
   workshops: 'workshops',
   system: 'system',
   registrationLocks: 'registrationLocks',
+  payments: 'payments',
+  admins: 'admins',
 });
 
 export const SYSTEM_DOCUMENTS = Object.freeze({
@@ -28,11 +30,19 @@ export const YEARS = Object.freeze([1, 2, 3, 4]);
 
 export const REGISTRATION_STATUS = Object.freeze({
   paymentPending: 'PAYMENT_PENDING',
+  confirmed: 'CONFIRMED',
   expired: 'EXPIRED',
 });
 
 export const PAYMENT_STATUS = Object.freeze({
   pending: 'PENDING',
+  paid: 'PAID',
+});
+
+export const ORDER_CREATION_STATUS = Object.freeze({
+  creating: 'CREATING',
+  ready: 'READY',
+  failed: 'FAILED',
 });
 
 export const DEFAULT_CONFIGURATION = Object.freeze({

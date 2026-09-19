@@ -8,12 +8,13 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test src/*.test.js && npm --prefix functions test",
-    "test:emulator": "firebase emulators:exec --only firestore --project demo-vyora-26 \"npm --prefix functions run test:emulator\"",
-    "test:functions-emulator": "firebase emulators:exec --only firestore,functions --project demo-vyora-26 \"npm --prefix functions run bootstrap && npm --prefix functions run bootstrap && node functions/test/functions-smoke.js\"",
-    "emulators": "firebase emulators:start --only firestore,functions,hosting --project demo-vyora-26",
+    "test:emulator": "firebase emulators:exec --only auth,firestore --project demo-vyora-26 \"npm --prefix functions run test:emulator\"",
+    "test:functions-emulator": "firebase emulators:exec --only auth,firestore,functions --project demo-vyora-26 \"npm --prefix functions run bootstrap && npm --prefix functions run bootstrap && node functions/test/functions-smoke.js\"",
+    "emulators": "firebase emulators:start --only auth,firestore,functions,hosting --project demo-vyora-26",
     "bootstrap:emulator": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=demo-vyora-26 npm --prefix functions run bootstrap"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

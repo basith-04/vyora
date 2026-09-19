@@ -185,9 +185,12 @@ test('expiration sweep evaluates the stored deadline and remains idempotent', as
   assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 0);
 });
 
-test('deny-by-default rules block public reads and writes', async () => {
+test('deny-by-default rules block public and authenticated client reads and writes', async () => {
   await seed();
   const publicDb = testEnvironment.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(publicDb, 'system', 'capacity')));
   await assertFails(setDoc(doc(publicDb, 'registrations', 'public-write'), valid));
+  const signedInDb = testEnvironment.authenticatedContext('firebase-user-without-direct-access').firestore();
+  await assertFails(getDoc(doc(signedInDb, 'registrations', 'any-registration')));
+  await assertFails(getDoc(doc(signedInDb, 'admins', 'firebase-user-without-direct-access')));
 });

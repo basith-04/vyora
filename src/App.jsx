@@ -8,6 +8,7 @@ import FieldPage from './FieldPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import PeoplePage from './PeoplePage.jsx';
 import RegistrationPage from './RegistrationPage.jsx';
+import { Footer, PolicyPage, informationPaths } from './InformationPages.jsx';
 import { publicSections } from './siteNavigation.js';
 
 const sectionIds = new Set(publicSections.map(({ id }) => id));
@@ -110,9 +111,9 @@ function WindowChrome() {
   );
 }
 
-function Navbar({ activeSection, isRegistration, onSectionNavigate }) {
+function Navbar({ activeSection, isRegistration, isStandalone, onSectionNavigate }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const selectedSection = isRegistration ? 'register' : activeSection;
+  const selectedSection = isRegistration ? 'register' : isStandalone ? undefined : activeSection;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -125,13 +126,13 @@ function Navbar({ activeSection, isRegistration, onSectionNavigate }) {
 
   return (
     <header className="site-header">
-      <a className="brand" href={isRegistration ? '/#home' : '#home'} aria-label="VYORA '26, Home" onClick={() => { setMenuOpen(false); if (!isRegistration) onSectionNavigate('home'); }}>
+      <a className="brand" href={isStandalone ? '/#home' : '#home'} aria-label="VYORA '26, Home" onClick={() => { setMenuOpen(false); if (!isStandalone) onSectionNavigate('home'); }}>
         <VyoraMark />
         <span>VYORA<span className="brand-apostrophe">'</span>26</span>
       </a>
       <nav className="desktop-nav" aria-label="Main navigation">
         {publicSections.map(({ label, id }) => (
-          <a key={id} href={isRegistration ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isRegistration && activeSection === id ? 'location' : undefined} onClick={() => { if (!isRegistration) onSectionNavigate(id); }}>{label}</a>
+          <a key={id} href={isStandalone ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isStandalone && activeSection === id ? 'location' : undefined} onClick={() => { if (!isStandalone) onSectionNavigate(id); }}>{label}</a>
         ))}
       </nav>
       <span className="header-motto" aria-hidden="true"><span>────→</span> A BRIGHTER TOMORROW</span>
@@ -148,7 +149,7 @@ function Navbar({ activeSection, isRegistration, onSectionNavigate }) {
       <nav id="mobile-navigation" className={`mobile-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Mobile navigation" inert={!menuOpen}>
         <span className="mobile-nav-heading">// SELECT DESTINATION</span>
         {publicSections.map(({ label, id }, index) => (
-          <a key={id} href={isRegistration ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isRegistration && activeSection === id ? 'location' : undefined} onClick={() => { setMenuOpen(false); if (!isRegistration) onSectionNavigate(id); }}>
+          <a key={id} href={isStandalone ? `/#${id}` : `#${id}`} className={selectedSection === id ? 'active' : undefined} aria-current={!isStandalone && activeSection === id ? 'location' : undefined} onClick={() => { setMenuOpen(false); if (!isStandalone) onSectionNavigate(id); }}>
             <span className="nav-index">0{index + 1}</span>{label}<span className="nav-arrow">→</span>
           </a>
         ))}
@@ -235,18 +236,28 @@ function ChapterBoundary() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
-  const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isRegistration);
+  const isPolicy = informationPaths.has(activePath);
+  const isStandalone = isRegistration || isPolicy;
+  const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);
 
   useEffect(() => {
-    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : "VYORA '26 — A Brighter Tomorrow";
-  }, [isRegistration]);
+    const titles = {
+      '/about-us': "About Us | VYORA '26",
+      '/contact-us': "Contact Us | VYORA '26",
+      '/terms-and-conditions': "Terms & Conditions | VYORA '26",
+      '/privacy-policy': "Privacy Policy | VYORA '26",
+      '/cancellation-and-refund': "Cancellation & Refund Policy | VYORA '26",
+      '/shipping-and-delivery': "Shipping & Delivery Policy | VYORA '26",
+    };
+    document.title = isRegistration ? "REGISTRATION.EXE — VYORA '26" : titles[activePath] || "VYORA '26 — A Brighter Tomorrow";
+  }, [activePath, isRegistration]);
 
   return (
     <div className="desktop-surround">
       <div className={`app-shell${isRegistration ? '' : ' public-app-shell'}`}>
         <WindowChrome />
-        <Navbar activeSection={activeSection} isRegistration={isRegistration} onSectionNavigate={onSectionNavigate} />
-        {isRegistration ? <RegistrationPage /> : <main className="public-journey" id="main-content">
+        <Navbar activeSection={activeSection} isRegistration={isRegistration} isStandalone={isStandalone} onSectionNavigate={onSectionNavigate} />
+        {isRegistration ? <RegistrationPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
           <HomeHero />
           <ChapterBoundary />
           <ProgramPage />
@@ -258,6 +269,7 @@ export default function App() {
           <FieldPage />
           <ChapterBoundary />
           <RegisterPage />
+          <Footer />
         </main>}
       </div>
     </div>

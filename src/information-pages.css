@@ -1,0 +1,25 @@
+.policy-page { position: relative; min-height: calc(100svh - var(--chrome-height) - var(--nav-height)); overflow: hidden; color: var(--vyora-ink); background: var(--vyora-paper); background-image: radial-gradient(rgba(25,54,67,.11) .6px, transparent .8px), linear-gradient(rgba(85,143,159,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(85,143,159,.08) 1px, transparent 1px); background-size: 4px 4px, 32px 32px, 32px 32px; }
+.policy-content { position: relative; z-index: 1; width: min(920px, calc(100% - 48px)); margin: 0 auto; padding: clamp(52px, 8vw, 110px) 0 90px; }
+.policy-eyebrow, .site-footer-label { color: #2c8095; font: 600 12px/1.4 var(--font-technical); letter-spacing: .11em; text-transform: uppercase; }
+.policy-content h1 { margin: 18px 0 20px; color: var(--vyora-ink); font: 700 clamp(48px, 8vw, 104px)/.9 var(--font-hero); letter-spacing: -.045em; }
+.policy-intro { max-width: 760px; margin: 0 0 56px; font: 500 clamp(17px, 2vw, 22px)/1.55 var(--font-technical); }
+.policy-section { max-width: 780px; margin: 0 0 36px; padding: 26px 0 0 24px; border-top: 2px solid rgba(22,73,91,.3); border-left: 3px solid var(--vyora-orange); }
+.policy-section h2 { margin: 0 0 13px; color: var(--vyora-navy); font: 700 clamp(18px, 2vw, 24px)/1.1 var(--font-display); letter-spacing: .02em; }
+.policy-section p, .policy-section li { margin: 0 0 13px; font: 400 16px/1.75 var(--font-technical); }
+.policy-section ul { margin: 0; padding-left: 23px; }
+.policy-section li::marker { color: var(--vyora-orange); }
+.policy-section a, .site-footer a { color: #075b88; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.policy-grid-mark { position: absolute; top: 45px; right: 7%; width: 130px; height: 130px; opacity: .5; background: linear-gradient(var(--vyora-orange),var(--vyora-orange)) center/1px 100% no-repeat, linear-gradient(var(--vyora-orange),var(--vyora-orange)) center/100% 1px no-repeat; }
+.policy-grid-mark::after { content: '+'; position: absolute; top: -15px; left: -7px; color: var(--vyora-orange); font: 20px var(--font-technical); }
+.site-footer { position: relative; z-index: 2; padding: 40px max(24px, 5vw) 20px; border-top: 3px double #81b4b5; background: var(--vyora-navy); color: var(--vyora-cream); }
+.site-footer-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 45px; max-width: 1320px; margin: 0 auto; }
+.site-footer-brand { margin: 0 0 12px; font: 700 clamp(32px, 4vw, 54px)/.9 var(--font-display); letter-spacing: -.04em; }
+.site-footer-brand span { color: var(--vyora-orange); }
+.site-footer-organizer, .site-footer address p, .site-footer address { margin: 0; color: #b5d3d6; font: 400 14px/1.65 var(--font-technical); font-style: normal; }
+.site-footer-label { display: block; margin-bottom: 13px; color: var(--vyora-teal); }
+.site-footer-links { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 18px; }
+.site-footer-links a { color: var(--vyora-cream); font: 400 13px/1.35 var(--font-technical); text-decoration: none; }
+.site-footer-links a:hover { color: var(--vyora-orange); }
+.site-footer address a { display: inline-block; margin-top: 10px; font: 500 14px var(--font-technical); }
+.site-footer-bottom { display: flex; justify-content: space-between; gap: 20px; max-width: 1320px; margin: 36px auto 0; padding-top: 13px; border-top: 1px solid #315466; color: #8eb1bb; font: 400 11px var(--font-technical); letter-spacing: .04em; }
+@media (max-width: 700px) { .policy-content { width: min(100% - 32px, 620px); padding: 44px 0 58px; } .policy-content h1 { font-size: clamp(42px, 13vw, 72px); } .policy-intro { margin-bottom: 38px; font-size: 15px; } .policy-section { padding-left: 16px; margin-bottom: 29px; } .policy-section p, .policy-section li { font-size: 14px; line-height: 1.65; } .policy-grid-mark { right: 2%; top: 30px; width: 70px; height: 70px; opacity: .32; } .site-footer { padding: 32px 18px 17px; } .site-footer-grid { grid-template-columns: 1fr; gap: 28px; } .site-footer-links { grid-template-columns: 1fr 1fr; gap: 11px 15px; } .site-footer-bottom { flex-direction: column; gap: 7px; margin-top: 28px; } }

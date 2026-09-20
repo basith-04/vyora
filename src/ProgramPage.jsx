@@ -13,8 +13,8 @@ const days = [
       { start: '5:00 PM', end: '5:30 PM', title: 'ARRIVAL', detail: 'Registration' },
       { start: '6:00 PM', end: '6:30 PM', title: 'SYSTEM START', detail: 'Inauguration' },
       { start: '6:30 PM', end: '7:00 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Former IEEE Kerala Section Chairperson'] },
-      { start: '7:00 PM', end: '8:00 PM', title: 'REFUEL', detail: 'Dinner' },
-      { start: '8:00 PM', end: '9:30 PM', title: 'NIGHT MODE', detail: 'Ice Breaking · IEEE WIE', notes: ['Musical Night'], terminal: true },
+      { start: '7:30 PM', end: '8:00 PM', title: 'REFUEL', detail: 'Dinner' },
+      { start: '8:30 PM', end: '9:30 PM', title: 'NIGHT MODE', detail: 'Ice Breaking · IEEE WIE', notes: ['Musical Night'], terminal: true },
     ],
   },
   {
@@ -24,9 +24,9 @@ const days = [
     isoDate: '2026-10-10',
     tone: 'blue',
     entries: [
-      { start: '8:30 AM', end: '9:30 AM', title: 'BREAKFAST', compact: true },
+      { start: '8:15 AM', end: '9:00 AM', title: 'BREAKFAST', compact: true },
       {
-        start: '9:30 AM', end: '10:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
+        start: '9:00 AM', end: '10:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
         tracks: [
           { number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', people: 'Sreeram M R', tone: 'orange' },
           { number: '02', title: 'AI / ML / DATA SCIENCE', people: 'Abhinav I · Usmanul Faris K S · Abhiram M S ', tone: 'blue' },

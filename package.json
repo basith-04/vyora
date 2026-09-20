@@ -14,7 +14,9 @@
     "bootstrap:emulator": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=demo-vyora-26 npm --prefix functions run bootstrap"
   },
   "dependencies": {
+    "@zxing/browser": "^0.1.5",
     "firebase": "^12.19.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

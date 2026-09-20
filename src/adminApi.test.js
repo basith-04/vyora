@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { adminRequest, AdminApiError } from './adminApi.js';
+import {
+  adminRequest, AdminApiError, downloadRegistrationsCsv, reconcilePayment,
+} from './adminApi.js';
 
 function auth(tokens = ['token']) {
   let calls = 0;
@@ -51,10 +53,29 @@ test('CSV export response is returned as a Blob', async (context) => {
   assert.equal(await result.text(), '"registrationId"\r\n"VYR26-1"');
 });
 
+test('CSV export sends only active dashboard search and filters', async (context) => {
+  context.mock.method(globalThis, 'fetch', async (path) => {
+    assert.equal(path, '/api/admin/export/registrations.csv?search=Devika&year=1&ieee=false');
+    return new Response('"registrationId"', { status: 200, headers: { 'Content-Type': 'text/csv' } });
+  });
+  await downloadRegistrationsCsv(auth(), '  Devika  ', { year: '1', ieee: 'false', workshopId: '' });
+});
+
 test('admin API maps network failures without exposing raw fetch errors', async (context) => {
   context.mock.method(globalThis, 'fetch', async () => { throw new Error('socket details'); });
   await assert.rejects(
     adminRequest(auth(), '/api/admin/check-ins', { method: 'POST' }),
     (error) => error.code === 'NETWORK_ERROR' && error.status === 0 && !error.message.includes('socket'),
   );
+});
+
+test('manual reconciliation sends only the registration ID in the protected path', async (context) => {
+  context.mock.method(globalThis, 'fetch', async (path, options) => {
+    assert.equal(path, '/api/admin/registrations/VYR26-TEST%2FSAFE/reconcile-payment');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.body, undefined);
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    return new Response(JSON.stringify({ data: { outcome: 'CONFIRMED' } }), { status: 200 });
+  });
+  assert.deepEqual(await reconcilePayment(auth(), 'VYR26-TEST/SAFE'), { outcome: 'CONFIRMED' });
 });

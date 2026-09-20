@@ -6,6 +6,7 @@ export const workshopLabels = Object.freeze({
 
 export const hostelLabels = Object.freeze({
   SANJOSE: 'Sanjose', SANTHOME: 'Santhome', HOLY_CROSS: 'Holy Cross', ALPHONSA: 'Alphonsa',
+  PG_HOUSE_NEAR_COLLEGE: 'PG/House Near College',
 });
 
 export const defaultFilters = Object.freeze({

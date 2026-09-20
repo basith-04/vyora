@@ -3,7 +3,7 @@ import { getAdminAuth } from './firebaseClient.js';
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 import {
   downloadRegistrationsCsv, loadAdminProfile, loadDashboard, loadRegistration,
-  loadRegistrations, retryConfirmationEmail,
+  loadRegistrations, reconcilePayment, retryConfirmationEmail,
 } from './adminApi.js';
 import {
   defaultFilters, filterRegistrations, formatDate, hostelLabels, readableStatus,
@@ -64,11 +64,19 @@ function CapacityBar({ label, occupied, capacity }) {
   );
 }
 
-function Overview({ dashboard }) {
+function Overview({ dashboard, canReconcilePayment, onReconcilePayment }) {
   const registration = dashboard.registrations.status;
   const payment = dashboard.payments.status;
   return (
     <div className="admin-stack">
+      {canReconcilePayment && (
+        <section className="admin-panel">
+          <div className="panel-heading">
+            <div><h2>Manual payment reconciliation</h2><span>Verify captured Razorpay payments and safely restore available capacity</span></div>
+            <button type="button" onClick={onReconcilePayment}>RECONCILE PAYMENT</button>
+          </div>
+        </section>
+      )}
       {dashboard.payments.reconciliationRequired > 0 && (
         <section className="attention-panel" role="status">
           <strong>PAYMENT ATTENTION REQUIRED</strong>
@@ -134,9 +142,7 @@ function RegistrationTable({ registrations, onOpen }) {
   );
 }
 
-function RegistrationsView({ registrations, onOpen }) {
-  const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ ...defaultFilters });
+function RegistrationsView({ registrations, onOpen, search, setSearch, filters, setFilters }) {
   const result = useMemo(() => filterRegistrations(registrations, search, filters), [registrations, search, filters]);
   const change = (event) => setFilters((current) => ({ ...current, [event.target.name]: event.target.value }));
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -182,6 +188,81 @@ function AccommodationView({ dashboard, registrations, onOpen }) {
   </div></section><section className="admin-panel"><div className="panel-heading"><h2>Accommodation participants</h2><span>{active.length} active records</span></div><div className="summary-list">{active.map((item) => <button key={item.registrationId} type="button" onClick={() => onOpen(item.registrationId)}><span><strong>{item.fullName}</strong><small>{item.isHosteller ? hostelLabels[item.hostel] : `${readableStatus(item.stayType)} stay requested`} · {item.registrationId}</small></span><StatusBadge value={item.registrationStatus} /></button>)}</div></section></div>;
 }
 
+function ManualPaymentReconciliation({ auth, dashboard, onChanged }) {
+  const [registrationId, setRegistrationId] = useState('');
+  const [registration, setRegistration] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+
+  const find = async (event) => {
+    event.preventDefault();
+    const id = registrationId.trim().toUpperCase();
+    if (!id) return;
+    setLoading(true); setError(''); setResult(null); setRegistration(null);
+    try {
+      const found = await loadRegistration(auth, id);
+      setRegistration(found); setRegistrationId(found.registrationId);
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirm = async () => {
+    if (!registration || !window.confirm(`Verify Razorpay and reconcile ${registration.registrationId}? Capacity and confirmation will change only if the payment and available seats are verified.`)) return;
+    setConfirming(true); setError(''); setResult(null);
+    try {
+      const nextResult = await reconcilePayment(auth, registration.registrationId);
+      setResult(nextResult);
+      await onChanged();
+      setRegistration(await loadRegistration(auth, registration.registrationId));
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const workshop = registration
+    ? dashboard.workshops.find((item) => item.id === registration.workshopId)
+    : null;
+  const stay = registration
+    ? (registration.isHosteller
+      ? `Hosteller — ${hostelLabels[registration.hostel] || registration.hostel || 'Not recorded'}`
+      : (registration.needsStay ? `${readableStatus(registration.stayType)} stay requested` : 'No stay requested'))
+    : '';
+
+  return <div className="admin-stack">
+    <section className="admin-panel reconciliation-panel">
+      <div className="panel-heading"><div><h2>Manual payment reconciliation</h2><span>ADMIN only · Razorpay remains authoritative</span></div></div>
+      <p className="reconciliation-guidance">Enter a registration ID. This tool cannot force payment, price, status, workshop, or capacity values.</p>
+      <form className="reconciliation-search" onSubmit={find}>
+        <label>Registration ID<input value={registrationId} onChange={(event) => setRegistrationId(event.target.value)} placeholder="VYR26-N2E63RD2VK91G2ZK5PUK" required autoComplete="off" /></label>
+        <button type="submit" disabled={loading || confirming}>{loading ? 'FINDING…' : 'FIND REGISTRATION'}</button>
+      </form>
+      {error && <div className="admin-error" role="alert">{error}</div>}
+      {result && <div className={result.outcome === 'PAYMENT_VERIFIED_NO_CAPACITY' ? 'attention-panel' : 'reconciliation-success'} role="status"><strong>{result.outcome === 'PAYMENT_VERIFIED_NO_CAPACITY' ? 'PAYMENT VERIFIED — NO CAPACITY AVAILABLE' : readableStatus(result.outcome)}</strong><span>{result.reason ? readableStatus(result.reason) : `${result.paymentStatus} · ${result.registrationStatus}`}</span></div>}
+    </section>
+    {registration && <section className="admin-panel reconciliation-record">
+      <div className="panel-heading"><div><h2>{registration.fullName}</h2><span>{registration.registrationId}</span></div><StatusBadge value={registration.registrationStatus} attention={registration.paymentReconciliationRequired} /></div>
+      <div className="reconciliation-columns">
+        <dl><dt>Email</dt><dd>{registration.email}</dd><dt>Phone</dt><dd>{registration.phone}</dd><dt>Department</dt><dd>{registration.department || '—'}</dd><dt>Class</dt><dd>{registration.class || '—'}</dd><dt>Year</dt><dd>Year {registration.year}</dd><dt>IEEE</dt><dd>{registration.ieeeMember ? 'IEEE Member' : 'Non-IEEE'}</dd></dl>
+        <dl><dt>Workshop</dt><dd>{workshopLabels[registration.workshopId] || registration.workshopId}</dd><dt>Accommodation</dt><dd>{stay}</dd><dt>Expected amount</dt><dd>₹{registration.totalFee}</dd><dt>Payment</dt><dd>{readableStatus(registration.paymentStatus)}</dd><dt>Reconciliation</dt><dd>{registration.paymentReconciliationRequired ? 'Required' : 'Not required'}</dd><dt>Razorpay order</dt><dd className="breakable">{registration.razorpayOrderId || '—'}</dd></dl>
+      </div>
+      <div className="reconciliation-capacity" aria-label="Current capacity snapshot">
+        <span>Event: {dashboard.capacity.event.occupied} / {dashboard.capacity.event.capacity}</span>
+        {registration.year === 1 && <span>First year: {dashboard.capacity.firstYear.occupied} / {dashboard.capacity.firstYear.capacity}</span>}
+        {workshop && <span>{workshop.name}: {workshop.occupied} / {workshop.capacity}</span>}
+      </div>
+      <p className="reconciliation-warning">The backend will query Razorpay again and re-check all capacity inside a transaction. This displayed capacity is informational only.</p>
+      <button className="reconciliation-confirm" type="button" onClick={confirm} disabled={confirming || !registration.razorpayOrderId}>{confirming ? 'VERIFYING RAZORPAY…' : 'VERIFY PAYMENT & CONFIRM'}</button>
+    </section>}
+  </div>;
+}
+
 function Detail({ registration, loading, onClose, onRetryEmail, emailRetrying }) {
   return <div className="detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="registration-detail-title">
     <button className="detail-close" type="button" aria-label="Close registration detail" onClick={onClose}>×</button>
@@ -212,6 +293,8 @@ export default function AdminPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [emailRetrying, setEmailRetrying] = useState(false);
+  const [registrationSearch, setRegistrationSearch] = useState('');
+  const [registrationFilters, setRegistrationFilters] = useState({ ...defaultFilters });
 
   useEffect(() => {
     let instance;
@@ -251,7 +334,7 @@ export default function AdminPage() {
   const exportCsv = async () => {
     setExporting(true); setMessage('');
     try {
-      const blob = await downloadRegistrationsCsv(auth);
+      const blob = await downloadRegistrationsCsv(auth, registrationSearch, registrationFilters);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'vyora-26-registrations.csv'; anchor.click();
       URL.revokeObjectURL(url);
@@ -275,6 +358,13 @@ export default function AdminPage() {
       setEmailRetrying(false);
     }
   };
+  const refreshReportingData = async () => {
+    const [nextDashboard, nextRegistrations] = await Promise.all([
+      loadDashboard(auth), loadRegistrations(auth),
+    ]);
+    setDashboard(nextDashboard);
+    setRegistrations(nextRegistrations.registrations);
+  };
 
   if (state === 'configuration-error') return <main className="admin-center-state"><h1>Admin configuration required</h1><p>{message}</p></main>;
   if (state === 'authenticating' || user === undefined) return <main className="admin-center-state"><div className="admin-spinner" /><p>Authenticating staff session…</p></main>;
@@ -285,14 +375,15 @@ export default function AdminPage() {
 
   return <div className="admin-app">
     <header className="admin-header"><div><p className="admin-kicker">VYORA '26 // OPERATIONS</p><h1>Staff Dashboard</h1></div><div className="admin-identity"><span>{profile.name}<small>{profile.role} · {profile.email}</small></span><button className="secondary-button" onClick={refresh}>Refresh</button><button onClick={() => logoutAdmin(auth)}>Logout</button></div></header>
-    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in']].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
+    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
     {message && <div className="admin-page-message" role="alert">{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}>×</button></div>}
     <main className="admin-content">
-      {view === 'overview' && <Overview dashboard={dashboard} />}
-      {view === 'registrations' && <RegistrationsView registrations={registrations} onOpen={openDetail} />}
+      {view === 'overview' && <Overview dashboard={dashboard} canReconcilePayment={profile.role === 'ADMIN'} onReconcilePayment={() => selectView('reconciliation')} />}
+      {view === 'registrations' && <RegistrationsView registrations={registrations} onOpen={openDetail} search={registrationSearch} setSearch={setRegistrationSearch} filters={registrationFilters} setFilters={setRegistrationFilters} />}
       {view === 'workshops' && <WorkshopView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'accommodation' && <AccommodationView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'checkin' && <CheckInView auth={auth} />}
+      {view === 'reconciliation' && profile.role === 'ADMIN' && <ManualPaymentReconciliation auth={auth} dashboard={dashboard} onChanged={refreshReportingData} />}
     </main>
     {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} onRetryEmail={retryEmail} emailRetrying={emailRetrying} />}
   </div>;

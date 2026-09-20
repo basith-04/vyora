@@ -1,0 +1,20 @@
+export function checkinPresentation(value) {
+  const code = value?.outcome || value?.code || 'CHECKIN_FAILED';
+  if (code === 'CHECKED_IN') return { kind: 'success', icon: '✓', title: 'CHECK-IN SUCCESSFUL' };
+  if (code === 'ALREADY_CHECKED_IN') return { kind: 'warning', icon: '⚠', title: 'ALREADY CHECKED IN' };
+  const messages = {
+    WORKSHOP_MISMATCH: 'NOT REGISTERED FOR THIS WORKSHOP',
+    INVALID_TICKET: 'INVALID TICKET',
+    TICKET_REVOKED: 'TICKET REVOKED',
+    REGISTRATION_NOT_CONFIRMED: 'REGISTRATION NOT CONFIRMED',
+    REGISTRATION_NOT_FOUND: 'REGISTRATION NOT FOUND',
+    WORKSHOP_REQUIRED: 'SELECT A WORKSHOP',
+    INVALID_CHECKIN_TYPE: 'INVALID CHECK-IN MODE',
+    INVALID_CHECKIN_REQUEST: 'INVALID CHECK-IN REQUEST',
+    ADMIN_AUTH_REQUIRED: 'STAFF SESSION REQUIRED',
+    ADMIN_TOKEN_INVALID: 'STAFF SESSION EXPIRED',
+    ADMIN_ACCESS_DENIED: 'STAFF ACCESS DENIED',
+    NETWORK_ERROR: 'NETWORK ERROR',
+  };
+  return { kind: 'error', icon: '✕', title: messages[code] || 'CHECK-IN FAILED' };
+}

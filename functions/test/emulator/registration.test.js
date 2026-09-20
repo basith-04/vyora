@@ -22,6 +22,8 @@ const valid = {
   email: 'test@example.com',
   phone: '9876543210',
   year: 2,
+  department: 'CSE',
+  class: 'CSE B',
   ieeeMember: false,
   ieeeMembershipId: null,
   isHosteller: false,
@@ -76,6 +78,16 @@ before(async () => {
 
 beforeEach(async () => {
   await testEnvironment.clearFirestore();
+});
+
+test('valid registration persists department and class without changing pricing', async () => {
+  await seed();
+  const create = createRegistrationService({ db });
+  const result = await register(create, valid);
+  const stored = (await db.doc(`registrations/${result.registrationDocId}`).get()).data();
+  assert.equal(stored.department, 'CSE');
+  assert.equal(stored.class, 'CSE B');
+  assert.deepEqual(result.pricing, { baseFee: 799, stayFee: 0, totalFee: 799 });
 });
 
 after(async () => {

@@ -12,7 +12,7 @@ const days = [
     entries: [
       { start: '5:00 PM', end: '5:30 PM', title: 'ARRIVAL', detail: 'Registration' },
       { start: '6:00 PM', end: '6:30 PM', title: 'SYSTEM START', detail: 'Inauguration' },
-      { start: '6:30 PM', end: '7:00 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Past IEEE Kerala Section Chairperson'] },
+      { start: '6:30 PM', end: '7:00 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Former IEEE Kerala Section Chairperson'] },
       { start: '7:00 PM', end: '8:00 PM', title: 'REFUEL', detail: 'Dinner' },
       { start: '8:00 PM', end: '9:30 PM', title: 'NIGHT MODE', detail: 'Ice Breaking · IEEE WIE', notes: ['Musical Night'], terminal: true },
     ],
@@ -33,7 +33,7 @@ const days = [
           { number: '03', title: 'GITHUB × AI', people: 'Josin Joseph · Samanway T K ', tone: 'green' },
         ],
       },
-      { start: '10:30 PM', end: '12:30 PM', title: 'treasure hunt', compact: true },
+      { start: '10:30 PM', end: '12:30 PM', title: 'TREASURE HUNT', compact: true },
 
       { start: '12:30 PM', end: '1:30 PM', title: 'LUNCH BREAK', compact: true },
       { start: '1:30 PM', end: '2:30 PM', title: 'TECHNICAL TALK 01', detail: 'Dr. P. Santhi Thilagam', notes: ['Professor, NITK Surathkal'] },

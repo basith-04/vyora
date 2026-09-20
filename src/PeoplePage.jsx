@@ -21,7 +21,7 @@ const speakers = [
     tone: 'blue',
     name: 'Prof. Muhammed Kasim S',
     nameLines: ['Prof. Muhammed', 'Kasim S'],
-    role: ['PAST IEEE', 'KERALA SECTION CHAIR'],
+    role: ['Former IEEE', 'KERALA SECTION CHAIR'],
     portrait: kasimPortrait,
     icon: 'gear',
   },

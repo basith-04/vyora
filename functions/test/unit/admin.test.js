@@ -71,11 +71,13 @@ test('dashboard metrics distinguish operational capacity, registration states an
 test('admin registration response omits recovery and order-coordination internals', () => {
   const result = publicRegistration({
     registrationId: 'VYR26-SAFE', fullName: 'Safe Participant', email: 'safe@example.com', phone: '9876543210',
-    year: 3, ieeeMember: false, workshopId: 'github-ai', isHosteller: false, needsStay: false,
+    year: 3, department: 'CSE', class: 'CSE D', ieeeMember: false, workshopId: 'github-ai', isHosteller: false, needsStay: false,
     baseFee: 799, stayFee: 0, totalFee: 799, paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING',
     recoveryTokenHash: 'secret-hash', orderCreationAttemptId: 'private-attempt',
   });
   assert.equal(result.registrationId, 'VYR26-SAFE');
+  assert.equal(result.department, 'CSE');
+  assert.equal(result.class, 'CSE D');
   assert.equal(result.recoveryTokenHash, undefined);
   assert.equal(result.orderCreationAttemptId, undefined);
 });
@@ -83,13 +85,15 @@ test('admin registration response omits recovery and order-coordination internal
 test('CSV uses expected columns, escapes values and neutralizes spreadsheet formulas', () => {
   const csv = registrationsCsv([{
     registrationId: 'VYR26-1', fullName: '=HYPERLINK("bad")', email: 'a,b@example.com', phone: '+123',
-    year: 1, ieeeMember: true, ieeeMembershipId: 'IEEE\n"quoted"', workshopId: 'github-ai',
+    year: 1, department: 'ADS', class: 'ADS B', ieeeMember: true, ieeeMembershipId: 'IEEE\n"quoted"', workshopId: 'github-ai',
     isHosteller: false, hostel: null, needsStay: false, stayType: null, baseFee: 399, stayFee: 0,
     totalFee: 399, paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING',
     razorpayOrderId: null, razorpayPaymentId: null, paymentReconciliationRequired: false,
     createdAt: '2026-09-19T00:00:00.000Z', confirmedAt: null, expiredAt: null,
   }]);
   assert.match(csv, /^"registrationId","fullName"/);
+  assert.match(csv, /"year","department","class","ieeeMember"/);
+  assert.match(csv, /"ADS","ADS B"/);
   assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
   assert.match(csv, /"a,b@example.com"/);
   assert.match(csv, /"'\+123"/);

@@ -46,7 +46,7 @@ async function seedReportingData() {
   for (const [id, workshop] of Object.entries(DEFAULT_CONFIGURATION.workshops)) batch.set(db.doc(`workshops/${id}`), { ...workshop, occupied: id === 'github-ai' ? 2 : 0, createdAt: now, updatedAt: now });
   batch.set(db.doc('registrations/reg-1'), {
     registrationId: 'VYR26-ADMIN-1', fullName: 'Admin, Test', email: 'participant@example.com', phone: '9876543210',
-    year: 1, ieeeMember: true, ieeeMembershipId: 'IEEE-1', workshopId: 'github-ai',
+    year: 1, department: 'CSE', class: 'CSE A', ieeeMember: true, ieeeMembershipId: 'IEEE-1', workshopId: 'github-ai',
     isHosteller: false, hostel: null, needsStay: true, stayType: 'NON_AC', baseFee: 399,
     stayFee: 250, totalFee: 649, paymentStatus: 'PAID', registrationStatus: 'CONFIRMED',
     razorpayOrderId: 'order_admin', razorpayPaymentId: 'pay_admin', paymentReconciliationRequired: false,
@@ -116,6 +116,8 @@ test('Auth identity plus active admins document protects reporting endpoints', a
   const list = await request(app).get('/api/admin/registrations').set('Authorization', `Bearer ${token}`);
   assert.equal(list.status, 200);
   assert.equal(list.body.data.registrations.length, 2);
+  assert.equal(list.body.data.registrations.find((item) => item.registrationId === 'VYR26-ADMIN-1').class, 'CSE A');
+  assert.equal(list.body.data.registrations.find((item) => item.registrationId === 'VYR26-ADMIN-2').class, null);
   assert.equal(list.body.data.registrations[0].recoveryTokenHash, undefined);
 });
 
@@ -156,6 +158,8 @@ test('CSV export requires authorization and neutralizes participant formulas', a
   assert.match(response.headers['content-type'], /text\/csv/);
   assert.match(response.headers['content-disposition'], /attachment/);
   assert.match(response.text, /"registrationId","fullName"/);
+  assert.match(response.text, /"year","department","class","ieeeMember"/);
+  assert.match(response.text, /"CSE","CSE A"/);
   assert.match(response.text, /"'@Formula"/);
   assert.match(response.text, /"Admin, Test"/);
 });

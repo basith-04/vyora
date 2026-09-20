@@ -12,6 +12,8 @@ const valid = {
   email: 'test@example.com',
   phone: '9876543210',
   year: 2,
+  department: 'CSE',
+  class: 'CSE B',
   ieeeMember: false,
   ieeeMembershipId: null,
   isHosteller: false,
@@ -58,6 +60,34 @@ test('rejects an invalid workshop', () => {
   const error = errorFor({ ...valid, workshopId: 'data-science-python' });
   assert.equal(error.code, 'INVALID_PARTICIPANT_DATA');
   assert.ok(error.details.fields.workshopId);
+});
+
+test('accepts only classes belonging to each department', () => {
+  for (const className of ['CSE A', 'CSE B', 'CSE C', 'CSE D']) {
+    assert.equal(validateAndNormalizeRegistration({ ...valid, department: 'CSE', class: className }).class, className);
+  }
+  for (const className of ['ADS A', 'ADS B']) {
+    assert.equal(validateAndNormalizeRegistration({ ...valid, department: 'ADS', class: className }).class, className);
+  }
+  for (const department of ['CSD', 'CSBS', 'CS & CY', 'ECE', 'ME/CE', 'EEE', 'AEI']) {
+    const result = validateAndNormalizeRegistration({ ...valid, department, class: department });
+    assert.equal(result.department, department);
+    assert.equal(result.class, department);
+  }
+});
+
+test('rejects mismatched, unknown, and missing department/class values', () => {
+  for (const input of [
+    { ...valid, department: 'CSE', class: 'ADS A' },
+    { ...valid, department: 'ECE', class: 'CSE A' },
+    { ...valid, department: 'TEST', class: 'ADMIN' },
+    { ...valid, department: undefined },
+    { ...valid, class: undefined },
+  ]) {
+    const error = errorFor(input);
+    assert.equal(error.code, 'INVALID_PARTICIPANT_DATA');
+    assert.ok(error.details.fields.department || error.details.fields.class);
+  }
 });
 
 test('rejects invalid hosteller and stay combinations', () => {

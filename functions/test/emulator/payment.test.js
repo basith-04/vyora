@@ -22,6 +22,7 @@ let testEnvironment;
 
 const valid = {
   fullName: 'Payment Participant', email: 'payment@example.com', phone: '9876543210', year: 1,
+  department: 'ADS', class: 'ADS A',
   ieeeMember: true, ieeeMembershipId: 'IEEE-123', isHosteller: false, hostel: null,
   needsStay: true, stayType: 'AC', workshopId: 'github-ai',
 };

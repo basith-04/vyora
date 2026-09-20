@@ -195,6 +195,7 @@ a { color: inherit; }
 @media (max-width: 450px) {
   .hero-title { top: 4.1%; }
   .event-metadata { top: calc(var(--scene-height) * .27); }
+  .event-host > span:first-child { font-size: clamp(11px, 2.8vw, 12px); font-weight: 700; }
   .hero-tagline { top: calc(var(--scene-height) * .41); }
   .handwritten-note { bottom: 35px; font-size: clamp(27px, 7.2vw, 34px); }
   .location-plaque { bottom: 34px; width: 112px; font-size: 11px; }

@@ -23,7 +23,7 @@ async function apiRequest(path, body, token) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Registration-Token': token,
+        ...(token ? { 'X-Registration-Token': token } : {}),
       },
       body: JSON.stringify(body),
     });
@@ -52,4 +52,5 @@ export const registrationApi = {
   status: (registrationId, token) => apiRequest('/api/registrations/status', { registrationId }, token),
   verify: (payment, token) => apiRequest('/api/payments/verify', payment, token),
   ticket: (registrationId, token) => apiRequest('/api/registrations/ticket', { registrationId }, token),
+  viewTicket: (ticketViewToken) => apiRequest('/api/tickets/view', { ticketViewToken }),
 };

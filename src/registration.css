@@ -156,7 +156,14 @@
 .ticket-instructions { display: grid; gap: .3rem; padding: .9rem 1.2rem; border-top: 2px dashed #79908c; background: #f1ead7; text-align: center; }
 .ticket-instructions strong { color: #93401e; font: 700 .78rem var(--font-technical); }
 .ticket-instructions span { font: 500 .68rem/1.5 var(--font-technical); }
-.ticket-download { display: block; margin: 1rem auto 1.2rem; width: max-content; border: 2px solid #071c2c; background: #071c2c; color: #fffdf5; padding: .65rem 1rem; font: 700 .72rem var(--font-technical); text-decoration: none; }
+.ticket-download { display: block; margin: 1rem auto 1.2rem; width: max-content; border: 2px solid #071c2c; background: #071c2c; color: #fffdf5; padding: .65rem 1rem; cursor: pointer; font: 700 .72rem var(--font-technical); text-decoration: none; }
+.ticket-download:disabled { cursor: wait; opacity: .7; }
+.ticket-download-error { margin: -0.4rem 1rem 1rem; color: #9b351d; font: 600 .68rem/1.4 var(--font-technical); text-align: center; }
+.ticket-view-container { min-height: calc(100svh - 100px); }
+.ticket-view-heading { width: min(680px,100%); margin: 0 auto; text-align: center; }
+.ticket-view-heading > span { color: var(--vyora-green); font: 700 .68rem var(--font-technical); }
+.ticket-view-heading h1 { margin: .55rem 0; color: var(--vyora-cream); font: clamp(1.8rem,7vw,3.4rem)/1 var(--font-display); }
+.ticket-view-heading p { margin: 0 auto; max-width: 48rem; color: #b8ced0; font: 500 .74rem/1.55 var(--font-technical); }
 .ticket-loading, .ticket-error { padding: 1.5rem; text-align: center; }
 .ticket-loading p, .ticket-error p { margin: .5rem auto 1rem; font: 500 .75rem/1.5 var(--font-technical); }
 .ticket-error { border-color: #9b351d; box-shadow: 8px 8px 0 #9b351d; }

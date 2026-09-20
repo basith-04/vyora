@@ -56,6 +56,16 @@ function publicCheckin(checkin, adminNames = new Map()) {
   };
 }
 
+function publicConfirmationEmail(value) {
+  return {
+    status: value?.status || 'PENDING',
+    attempts: Number.isInteger(value?.attempts) ? value.attempts : 0,
+    sentAt: iso(value?.sentAt),
+    lastAttemptAt: iso(value?.lastAttemptAt),
+    lastErrorCode: value?.lastErrorCode || null,
+  };
+}
+
 export function publicRegistration(registration, payment = null, attendance = {}, adminNames = new Map()) {
   return {
     registrationId: registration.registrationId,
@@ -87,6 +97,7 @@ export function publicRegistration(registration, payment = null, attendance = {}
     confirmedAt: iso(registration.confirmedAt),
     expiredAt: iso(registration.expiredAt),
     cancelledAt: iso(registration.cancelledAt),
+    confirmationEmail: publicConfirmationEmail(registration.confirmationEmail),
     payment: publicPayment(payment),
     attendance: {
       event: publicCheckin(attendance.event, adminNames),

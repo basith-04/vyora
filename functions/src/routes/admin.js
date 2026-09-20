@@ -1,6 +1,8 @@
 import { Router } from 'express';
 
-export function createAdminRouter({ authorizeAdmin, reportingService, checkinService }) {
+export function createAdminRouter({
+  authorizeAdmin, reportingService, checkinService, confirmationEmailService,
+}) {
   const router = Router();
   router.use(authorizeAdmin);
 
@@ -49,6 +51,17 @@ export function createAdminRouter({ authorizeAdmin, reportingService, checkinSer
     router.post('/check-ins', async (request, response, next) => {
       try {
         response.status(200).json({ data: await checkinService.checkIn(request.body, request.admin) });
+      } catch (error) {
+        next(error);
+      }
+    });
+  }
+
+  if (confirmationEmailService) {
+    router.post('/registrations/:registrationId/confirmation-email/retry', async (request, response, next) => {
+      try {
+        const data = await confirmationEmailService.retryByRegistrationId(request.params.registrationId);
+        response.status(200).json({ data });
       } catch (error) {
         next(error);
       }

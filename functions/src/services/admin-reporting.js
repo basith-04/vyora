@@ -73,6 +73,8 @@ export function publicRegistration(registration, payment = null, attendance = {}
     email: registration.email,
     phone: registration.phone,
     year: registration.year,
+    department: registration.department || null,
+    class: registration.class || null,
     ieeeMember: registration.ieeeMember === true,
     ieeeMembershipId: registration.ieeeMembershipId || null,
     workshopId: registration.workshopId,
@@ -202,7 +204,7 @@ export function buildDashboard({ registrations, payments, capacity, workshops, c
 }
 
 const CSV_HEADERS = [
-  'registrationId', 'fullName', 'email', 'phone', 'year', 'ieeeMember',
+  'registrationId', 'fullName', 'email', 'phone', 'year', 'department', 'class', 'ieeeMember',
   'ieeeMembershipId', 'workshop', 'isHosteller', 'hostel', 'needsStay', 'stayType',
   'baseFee', 'stayFee', 'totalFee', 'paymentStatus', 'registrationStatus',
   'razorpayOrderId', 'razorpayPaymentId', 'paymentReconciliationRequired',
@@ -212,6 +214,7 @@ const CSV_HEADERS = [
 export function registrationsCsv(registrations) {
   return createCsv(CSV_HEADERS, registrations.map((item) => [
     item.registrationId, item.fullName, item.email, item.phone, item.year,
+    item.department, item.class,
     item.ieeeMember ? 'IEEE' : 'Non-IEEE', item.ieeeMembershipId,
     WORKSHOP_NAMES[item.workshopId] || item.workshopId,
     item.isHosteller ? 'Hosteller' : 'Non-hosteller', item.hostel,

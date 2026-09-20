@@ -29,7 +29,7 @@ export function formatDate(value) {
 export function filterRegistrations(registrations, search, filters) {
   const needle = search.trim().toLocaleLowerCase();
   return registrations.filter((item) => {
-    if (needle && ![item.registrationId, item.fullName, item.email, item.phone]
+    if (needle && ![item.registrationId, item.fullName, item.email, item.phone, item.department, item.class]
       .some((value) => String(value || '').toLocaleLowerCase().includes(needle))) return false;
     if (filters.registrationStatus && item.registrationStatus !== filters.registrationStatus) return false;
     if (filters.paymentStatus && item.paymentStatus !== filters.paymentStatus) return false;

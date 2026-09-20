@@ -4,14 +4,19 @@ import { defaultFilters, filterRegistrations, readableStatus } from './adminData
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 
 const registrations = [
-  { registrationId: 'VYR26-ALPHA', fullName: 'Alpha Person', email: 'alpha@example.com', phone: '9876500001', year: 1, ieeeMember: true, workshopId: 'data-science', isHosteller: true, hostel: 'SANJOSE', needsStay: false, stayType: null, paymentStatus: 'PAID', registrationStatus: 'CONFIRMED', paymentReconciliationRequired: false, attendance: { event: { checkedInAt: '2026-10-09T09:00:00Z' }, workshop: null } },
-  { registrationId: 'VYR26-BETA', fullName: 'Beta Person', email: 'beta@example.com', phone: '9876500002', year: 3, ieeeMember: false, workshopId: 'github-ai', isHosteller: false, hostel: null, needsStay: true, stayType: 'AC', paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING', paymentReconciliationRequired: true, attendance: { event: null, workshop: { checkedInAt: '2026-10-09T14:00:00Z' } } },
+  { registrationId: 'VYR26-ALPHA', fullName: 'Alpha Person', email: 'alpha@example.com', phone: '9876500001', year: 1, department: 'CSE', class: 'CSE A', ieeeMember: true, workshopId: 'data-science', isHosteller: true, hostel: 'SANJOSE', needsStay: false, stayType: null, paymentStatus: 'PAID', registrationStatus: 'CONFIRMED', paymentReconciliationRequired: false, attendance: { event: { checkedInAt: '2026-10-09T09:00:00Z' }, workshop: null } },
+  { registrationId: 'VYR26-BETA', fullName: 'Beta Person', email: 'beta@example.com', phone: '9876500002', year: 3, department: 'ECE', class: 'ECE', ieeeMember: false, workshopId: 'github-ai', isHosteller: false, hostel: null, needsStay: true, stayType: 'AC', paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING', paymentReconciliationRequired: true, attendance: { event: null, workshop: { checkedInAt: '2026-10-09T14:00:00Z' } } },
 ];
 
 test('admin search covers registration ID, name, email and phone case-insensitively', () => {
   for (const search of ['alpha', 'PERSON', 'beta@example.com', '0002']) {
     assert.equal(filterRegistrations(registrations, search, defaultFilters).length, search === 'PERSON' ? 2 : 1);
   }
+});
+
+test('admin search also matches department and class metadata', () => {
+  assert.deepEqual(filterRegistrations(registrations, 'cse a', defaultFilters).map((item) => item.registrationId), ['VYR26-ALPHA']);
+  assert.deepEqual(filterRegistrations(registrations, 'ece', defaultFilters).map((item) => item.registrationId), ['VYR26-BETA']);
 });
 
 test('every important admin filter category and combined filtering works', () => {

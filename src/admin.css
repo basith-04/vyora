@@ -92,12 +92,51 @@
 .admin-center-state h1 { margin-bottom: .25rem; }
 .admin-spinner { width: 32px; height: 32px; margin: auto; border: 3px solid #7c9ca0; border-top-color: var(--admin-cyan); border-radius: 50%; animation: admin-spin .8s linear infinite; }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
+.checkin-layout { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(260px,.7fr); gap: 1rem; align-items: start; }
+.checkin-control { min-width: 0; border: 3px solid var(--admin-cyan); background: var(--admin-navy); color: #fff; padding: clamp(1rem,3vw,2rem); box-shadow: 5px 5px 0 #04121c; }
+.checkin-control.mode-workshop { border-color: var(--admin-orange); }
+.checkin-control h2 { margin: .2rem 0 1rem; font-family: Bungee, sans-serif; font-weight: 400; letter-spacing: .08em; }
+.checkin-mode { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+.checkin-mode button { min-height: 58px; border: 2px solid #75979b; background: transparent; color: #bcd0ce; font-size: 1rem; }
+.checkin-mode button.active { border-color: var(--admin-cyan); background: #12525c; color: #fff; box-shadow: inset 0 -4px 0 var(--admin-cyan); }
+.mode-workshop .checkin-mode button.active { border-color: var(--admin-orange); background: #5c321c; box-shadow: inset 0 -4px 0 var(--admin-orange); }
+.workshop-mode-select { display: grid; gap: .4rem; margin-top: 1rem; color: #b9cecc; font-size: .72rem; text-transform: uppercase; }
+.workshop-mode-select select, .manual-checkin textarea { width: 100%; min-height: 46px; border: 1px solid #7f9998; border-radius: 0; background: #fff; color: var(--admin-ink); padding: .65rem; font: inherit; }
+.active-mode-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1rem 0; padding: .8rem; border: 1px solid #47727a; background: #0c303b; }
+.active-mode-banner strong { color: var(--admin-cyan); font-size: .8rem; }
+.mode-workshop .active-mode-banner strong { color: #ffad70; }
+.active-mode-banner span { color: #b5c9c8; font-size: .68rem; }
+.scanner-viewport { position: relative; width: min(620px,100%); aspect-ratio: 4 / 3; margin: auto; overflow: hidden; border: 2px solid #73989c; background: #020b10; }
+.scanner-viewport video { width: 100%; height: 100%; object-fit: cover; }
+.scanner-frame { position: absolute; inset: 18%; border: 3px solid var(--admin-cyan); box-shadow: 0 0 0 999px rgba(2,11,16,.35); pointer-events: none; }
+.mode-workshop .scanner-frame { border-color: var(--admin-orange); }
+.scanner-error { margin-top: .8rem; border: 1px solid #e98058; background: #5a2417; color: #fff; padding: .8rem; font-size: .75rem; }
+.scanner-processing { display: grid; place-items: center; min-height: 280px; color: var(--admin-cyan); }
+.checkin-result { display: grid; justify-items: center; gap: .55rem; min-height: 340px; padding: clamp(1.2rem,4vw,2.5rem); border: 3px solid; background: #f9f5e8; color: var(--admin-ink); text-align: center; }
+.checkin-result .result-icon { display: grid; place-items: center; width: 74px; height: 74px; border: 4px solid currentColor; border-radius: 50%; font-size: 2.8rem; font-weight: 700; }
+.checkin-result h2 { margin: .3rem 0; font-family: Bungee, sans-serif; font-size: clamp(1.25rem,4vw,2rem); }
+.checkin-result .result-name { font-size: 1.25rem; }
+.checkin-result > span:not(.result-icon) { font-size: .78rem; }
+.checkin-result small { margin-top: .6rem; color: #5d7273; }
+.checkin-result button { min-width: 190px; margin-top: .8rem; min-height: 52px; }
+.result-success { border-color: #21845f; color: #135c40; background: #e7f6ea; }
+.result-warning { border-color: #bd7d13; color: #74500d; background: #fff2c9; }
+.result-error { border-color: #b84428; color: #7d2915; background: #ffe7dc; }
+.wrong-workshop { display: grid; gap: .35rem; margin: .6rem 0; padding: .8rem; border: 1px solid currentColor; }
+.manual-checkin { position: sticky; top: 1rem; }
+.manual-checkin h2 { margin: 0; font-size: .9rem; text-transform: uppercase; }
+.manual-checkin p { color: #5b7172; font-size: .7rem; line-height: 1.5; }
+.manual-checkin form, .manual-checkin label { display: grid; gap: .6rem; }
+.manual-checkin label { color: #526a6c; font-size: .68rem; text-transform: uppercase; }
+.manual-checkin textarea { resize: vertical; overflow-wrap: anywhere; }
 
 @media (max-width: 980px) {
   .admin-filters { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
   .admin-two-column, .summary-grid { grid-template-columns: 1fr; }
   .admin-header { align-items: flex-start; }
   .admin-identity { flex-wrap: wrap; }
+  .checkin-layout { grid-template-columns: 1fr; }
+  .manual-checkin { position: static; }
 }
 
 @media (max-width: 680px) {
@@ -119,4 +158,9 @@
   .registration-table td::before { content: attr(data-label); color: #66797b; font-size: .64rem; text-transform: uppercase; }
   .detail-drawer { padding: 1rem; }
   .detail-section dl { grid-template-columns: 100px minmax(0, 1fr); }
+  .checkin-control { padding: .8rem; box-shadow: 3px 3px 0 #04121c; }
+  .checkin-mode button { min-height: 52px; }
+  .active-mode-banner { align-items: flex-start; flex-direction: column; }
+  .scanner-viewport { aspect-ratio: 3 / 4; }
+  .scanner-frame { inset: 23% 12%; }
 }

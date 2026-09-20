@@ -50,3 +50,11 @@ test('CSV export response is returned as a Blob', async (context) => {
   const result = await adminRequest(auth(), '/api/admin/export/registrations.csv', { responseType: 'blob' });
   assert.equal(await result.text(), '"registrationId"\r\n"VYR26-1"');
 });
+
+test('admin API maps network failures without exposing raw fetch errors', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () => { throw new Error('socket details'); });
+  await assert.rejects(
+    adminRequest(auth(), '/api/admin/check-ins', { method: 'POST' }),
+    (error) => error.code === 'NETWORK_ERROR' && error.status === 0 && !error.message.includes('socket'),
+  );
+});

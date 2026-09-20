@@ -1,9 +1,10 @@
 export class AdminApiError extends Error {
-  constructor(code, message, status) {
+  constructor(code, message, status, details = undefined) {
     super(message);
     this.name = 'AdminApiError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -11,14 +12,18 @@ async function authorizedFetch(auth, path, options = {}, forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new AdminApiError('ADMIN_AUTH_REQUIRED', 'Your staff session has ended.', 401);
   const token = await user.getIdToken(forceRefresh);
-  return fetch(path, {
-    ...options,
-    headers: {
-      Accept: options.responseType === 'blob' ? 'text/csv' : 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
+  try {
+    return await fetch(path, {
+      ...options,
+      headers: {
+        Accept: options.responseType === 'blob' ? 'text/csv' : 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new AdminApiError('NETWORK_ERROR', 'The server could not be reached. Check the connection and try again.', 0);
+  }
 }
 
 export async function adminRequest(auth, path, options = {}) {
@@ -34,6 +39,7 @@ export async function adminRequest(auth, path, options = {}) {
     payload?.error?.code || 'ADMIN_API_ERROR',
     payload?.error?.message || 'The admin request could not be completed.',
     response.status,
+    payload?.error?.details,
   );
 }
 
@@ -42,3 +48,8 @@ export const loadDashboard = (auth) => adminRequest(auth, '/api/admin/dashboard'
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export const downloadRegistrationsCsv = (auth) => adminRequest(auth, '/api/admin/export/registrations.csv', { responseType: 'blob' });
+export const submitCheckin = (auth, input) => adminRequest(auth, '/api/admin/check-ins', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+});

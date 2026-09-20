@@ -82,7 +82,6 @@ before(async () => {
 
 beforeEach(async () => {
   await testEnvironment.clearFirestore();
-  for (const user of (await auth.listUsers()).users) await auth.deleteUser(user.uid);
   await seedReportingData();
 });
 

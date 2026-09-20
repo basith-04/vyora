@@ -1,11 +1,13 @@
 import { AppError } from '../errors.js';
-import { HOSTELS, STAY_TYPES, WORKSHOP_IDS, YEARS } from '../config/constants.js';
+import { DEPARTMENT_CLASSES, HOSTELS, STAY_TYPES, WORKSHOP_IDS, YEARS } from '../config/constants.js';
 
 const PARTICIPANT_FIELDS = new Set([
   'fullName',
   'email',
   'phone',
   'year',
+  'department',
+  'class',
   'ieeeMember',
   'ieeeMembershipId',
   'isHosteller',
@@ -88,6 +90,12 @@ export function validateAndNormalizeRegistration(input) {
   }
   if (!/^\d{10}$/.test(phone)) errors.phone = 'A valid 10-digit phone number is required.';
   if (!YEARS.includes(input.year)) errors.year = 'Year must be one of 1, 2, 3, or 4.';
+  if (!Object.hasOwn(DEPARTMENT_CLASSES, input.department)) {
+    errors.department = 'A valid department is required.';
+  }
+  if (!DEPARTMENT_CLASSES[input.department]?.includes(input.class)) {
+    errors.class = 'A valid class is required for the selected department.';
+  }
   if (typeof input.ieeeMember !== 'boolean') errors.ieeeMember = 'IEEE membership status is required.';
   if (typeof input.isHosteller !== 'boolean') errors.isHosteller = 'Hosteller status is required.';
   if (typeof input.needsStay !== 'boolean') errors.needsStay = 'Stay requirement is required.';
@@ -138,6 +146,8 @@ export function validateAndNormalizeRegistration(input) {
     email,
     phone,
     year: input.year,
+    department: input.department,
+    class: input.class,
     ieeeMember: input.ieeeMember,
     ieeeMembershipId: input.ieeeMember ? ieeeMembershipId : null,
     isHosteller: input.isHosteller,

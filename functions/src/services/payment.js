@@ -66,12 +66,13 @@ export function createPaymentService({
   db,
   razorpay,
   getKeySecret,
+  ticketService = null,
   clock = () => Date.now(),
   logger = console,
 }) {
   async function recordExceptionalPayment(ref, registration, payment, source, eventId, reason) {
     const paymentRef = db.collection(COLLECTIONS.payments).doc(payment.id);
-    return db.runTransaction(async (transaction) => {
+    const result = await db.runTransaction(async (transaction) => {
       const [registrationSnapshot, existingPaymentSnapshot] = await transaction.getAll(ref, paymentRef);
       if (!registrationSnapshot.exists) {
         throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
@@ -107,6 +108,7 @@ export function createPaymentService({
       transaction.update(ref, registrationUpdate);
       return { outcome: 'RECONCILIATION_REQUIRED', registrationStatus: current.registrationStatus };
     });
+    return result;
   }
 
   async function confirmFetchedPayment(ref, payment, order, { source, eventId = null }) {
@@ -125,7 +127,7 @@ export function createPaymentService({
     }
 
     const paymentRef = db.collection(COLLECTIONS.payments).doc(payment.id);
-    return db.runTransaction(async (transaction) => {
+    const result = await db.runTransaction(async (transaction) => {
       const [currentSnapshot, existingPaymentSnapshot] = await transaction.getAll(ref, paymentRef);
       if (!currentSnapshot.exists) {
         throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
@@ -192,6 +194,22 @@ export function createPaymentService({
       });
       return { outcome: 'CONFIRMED', registrationStatus: REGISTRATION_STATUS.confirmed, idempotent: false };
     });
+    if (result.outcome === 'CONFIRMED' && ticketService) {
+      try {
+        const issued = await ticketService.issueForRegistrationRef(ref);
+        result.ticketIssued = Boolean(issued.ticket);
+      } catch (error) {
+        // Payment truth is already committed. Ticket issuance is independently retryable.
+        logger.error('Ticket issuance after payment confirmation failed.', {
+          registrationId: registration.registrationId,
+          operation: 'issue_ticket',
+          result: 'failed',
+          code: error?.code || 'INTERNAL_ERROR',
+        });
+        result.ticketIssued = false;
+      }
+    }
+    return result;
   }
 
   async function fetchAndConfirm(ref, paymentId, context) {
@@ -243,6 +261,7 @@ export function createPaymentService({
       registrationStatus: REGISTRATION_STATUS.confirmed,
       paymentStatus: PAYMENT_STATUS.paid,
       idempotent: result.idempotent,
+      ticketIssued: result.ticketIssued === true,
     };
   }
 

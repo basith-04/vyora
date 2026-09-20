@@ -11,6 +11,7 @@ export const FLOW_PHASE = Object.freeze({
   networkError: 'network_error',
 });
 
+
 export function isBusyPhase(phase) {
   return phase === FLOW_PHASE.reserving || phase === FLOW_PHASE.verifying;
 }

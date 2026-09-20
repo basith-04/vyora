@@ -10,6 +10,7 @@ import { createCheckoutService } from '../../src/services/checkout.js';
 import { createPaymentService } from '../../src/services/payment.js';
 import { DEFAULT_CONFIGURATION } from '../../src/config/constants.js';
 import { createTicketService } from '../../src/services/ticket.js';
+import { createConfirmationEmailService } from '../../src/services/confirmation-email.js';
 
 const projectId = process.env.GCLOUD_PROJECT || 'demo-vyora-26';
 const recoveryTokenHash = 'a'.repeat(64);
@@ -87,9 +88,15 @@ async function createReadyRegistration(gateway = fakeGateway()) {
   return { result, gateway, expirationService };
 }
 
-function paymentService(gateway, clock = () => creationTime + 60_000, ticketService = null) {
+function paymentService(
+  gateway,
+  clock = () => creationTime + 60_000,
+  ticketService = null,
+  confirmationEmailService = null,
+) {
   return createPaymentService({
-    db, razorpay: gateway, getKeySecret: () => keySecret, ticketService, clock, logger: { error() {} },
+    db, razorpay: gateway, getKeySecret: () => keySecret,
+    ticketService, confirmationEmailService, clock, logger: { error() {} },
   });
 }
 
@@ -225,19 +232,58 @@ test('valid verification confirms once without changing capacity', async () => {
   assert.equal((await db.collection('payments').get()).size, 1);
 });
 
-test('payment confirmation best-effort issues exactly one ticket without changing payment truth', async () => {
+test('confirmed payment issues one ticket and one idempotent confirmation email', async () => {
   const { result, gateway } = await createReadyRegistration();
+  let emailCalls = 0;
   const tickets = createTicketService({
     db,
     getSigningSecret: () => 'phase4-payment-ticket-signing-secret-value',
     clock: () => creationTime + 60_000,
   });
-  const service = paymentService(gateway, () => creationTime + 60_000, tickets);
+  const email = createConfirmationEmailService({
+    db,
+    ticketService: tickets,
+    provider: { send: async () => { emailCalls += 1; return { providerMessageId: 'email_payment' }; } },
+    getPublicBaseUrl: () => 'https://vyora.example',
+    clock: () => creationTime + 60_000,
+    logger: { error() {} },
+  });
+  const service = paymentService(gateway, () => creationTime + 60_000, tickets, email);
   const first = await verify(service, result, 'pay_ticket');
   const second = await verify(service, result, 'pay_ticket');
   assert.equal(first.registrationStatus, 'CONFIRMED');
   assert.equal(first.ticketIssued, true);
   assert.equal(second.ticketIssued, true);
+  assert.equal((await db.collection('tickets').get()).size, 1);
+  assert.equal((await db.collection('payments').get()).size, 1);
+  assert.equal(emailCalls, 1);
+  assert.equal((await db.collection('registrations').limit(1).get()).docs[0].data().confirmationEmail.status, 'SENT');
+});
+
+test('concurrent frontend and webhook confirmation paths do not duplicate confirmation email', async () => {
+  const { result, gateway } = await createReadyRegistration();
+  let emailCalls = 0;
+  const tickets = createTicketService({
+    db,
+    getSigningSecret: () => 'phase5-concurrent-ticket-signing-secret-value',
+    clock: () => creationTime + 60_000,
+  });
+  const email = createConfirmationEmailService({
+    db,
+    ticketService: tickets,
+    provider: { send: async () => { emailCalls += 1; return { providerMessageId: 'email_concurrent' }; } },
+    getPublicBaseUrl: () => 'https://vyora.example',
+    clock: () => creationTime + 60_000,
+    logger: { error() {} },
+  });
+  const service = paymentService(gateway, () => creationTime + 60_000, tickets, email);
+  await Promise.all([
+    verify(service, result, 'pay_concurrent_email'),
+    service.processCapturedWebhook({
+      paymentId: 'pay_concurrent_email', orderId: result.checkout.orderId, eventId: 'event_concurrent_email',
+    }),
+  ]);
+  assert.equal(emailCalls, 1);
   assert.equal((await db.collection('tickets').get()).size, 1);
   assert.equal((await db.collection('payments').get()).size, 1);
 });

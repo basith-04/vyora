@@ -85,6 +85,9 @@ before(async () => {
       authorizeAdmin: createAdminAuthorization({ auth, db }),
       reportingService: createAdminReportingService({ db }),
       checkinService: createCheckinService({ db, ticketService, clock: () => Date.parse('2026-09-19T11:05:00.000Z') }),
+      confirmationEmailService: {
+        retryByRegistrationId: async (registrationId) => ({ outcome: 'SENT', registrationId }),
+      },
     }),
     logger: { error() {} },
   });
@@ -177,4 +180,14 @@ test('check-in API requires staff authorization and ignores no client-supplied s
   assert.equal(valid.body.data.outcome, 'CHECKED_IN');
   const stored = (await db.collection('checkins').limit(1).get()).docs[0].data();
   assert.equal(stored.checkedInBy, user.uid);
+});
+
+test('confirmation email retry endpoint requires an active staff identity', async () => {
+  const path = '/api/admin/registrations/VYR26-ADMIN-1/confirmation-email/retry';
+  assert.equal((await request(app).post(path)).status, 401);
+  const { user, token } = await createIdentity('email-retry@example.com');
+  await db.doc(`admins/${user.uid}`).set({ name: 'Email Staff', email: user.email, role: 'COORDINATOR', active: true });
+  const response = await request(app).post(path).set('Authorization', `Bearer ${token}`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.data, { outcome: 'SENT', registrationId: 'VYR26-ADMIN-1' });
 });

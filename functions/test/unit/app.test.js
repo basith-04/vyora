@@ -28,6 +28,7 @@ function services(overrides = {}) {
     webhookService: { handleWebhook: async () => ({ outcome: 'IGNORED' }), ...overrides.webhookService },
     ticketService: {
       participantTicket: async () => ({ ticketId: 'TKT-TEST', ticketPayload: 'opaque-ticket' }),
+      viewByToken: async () => ({ ticketId: 'TKT-VIEW', ticketPayload: 'opaque-ticket' }),
       ...overrides.ticketService,
     },
   };
@@ -43,6 +44,18 @@ test('registration endpoint returns participant-safe checkout fields', async () 
   assert.equal(response.body.data.registrationId, 'VYR26-ABCDEFGHIJKLMNOPQRST');
   assert.equal(response.body.data.registrationDocId, undefined);
   assert.equal(response.body.data.checkout.amount, 39900);
+});
+
+test('ticket view endpoint accepts only the dedicated view credential field', async () => {
+  let received;
+  const app = createApp(services({
+    ticketService: { viewByToken: async (value) => { received = value; return { ticketId: 'TKT-VIEW' }; } },
+  }));
+  const response = await request(app).post('/api/tickets/view').send({ ticketViewToken: 'vyora26:v:opaque' });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.ticketId, 'TKT-VIEW');
+  assert.equal(received, 'vyora26:v:opaque');
+  assert.equal((await request(app).post('/api/tickets/view').send({ ticketViewToken: 'x', registrationStatus: 'CONFIRMED' })).status, 400);
 });
 
 test('participant ticket endpoint uses the existing recovery-token boundary', async () => {

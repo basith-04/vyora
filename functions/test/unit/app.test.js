@@ -26,6 +26,10 @@ function services(overrides = {}) {
     },
     paymentService: { verifyFromFrontend: async () => ({}), ...overrides.paymentService },
     webhookService: { handleWebhook: async () => ({ outcome: 'IGNORED' }), ...overrides.webhookService },
+    ticketService: {
+      participantTicket: async () => ({ ticketId: 'TKT-TEST', ticketPayload: 'opaque-ticket' }),
+      ...overrides.ticketService,
+    },
   };
 }
 
@@ -39,6 +43,25 @@ test('registration endpoint returns participant-safe checkout fields', async () 
   assert.equal(response.body.data.registrationId, 'VYR26-ABCDEFGHIJKLMNOPQRST');
   assert.equal(response.body.data.registrationDocId, undefined);
   assert.equal(response.body.data.checkout.amount, 39900);
+});
+
+test('participant ticket endpoint uses the existing recovery-token boundary', async () => {
+  let received;
+  const app = createApp(services({
+    ticketService: { participantTicket: async (registrationId, recoveryHash) => {
+      received = { registrationId, recoveryHash };
+      return { ticketId: 'TKT-TEST', ticketPayload: 'vyora26:t:opaque' };
+    } },
+  }));
+  const response = await request(app)
+    .post('/api/registrations/ticket')
+    .set('X-Registration-Token', token)
+    .send({ registrationId: 'VYR26-TEST' });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.ticketId, 'TKT-TEST');
+  assert.equal(received.registrationId, 'VYR26-TEST');
+  assert.match(received.recoveryHash, /^[a-f0-9]{64}$/);
+  assert.equal((await request(app).post('/api/registrations/ticket').send({ registrationId: 'VYR26-TEST' })).status, 400);
 });
 
 test('registration endpoint requires an opaque recovery token', async () => {

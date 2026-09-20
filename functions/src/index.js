@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { defineSecret } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { db, auth } from './firebase.js';
 import { createApp } from './app.js';
@@ -15,11 +15,16 @@ import { createAdminReportingService } from './services/admin-reporting.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createTicketService } from './services/ticket.js';
 import { createCheckinService } from './services/checkin.js';
+import { createResendEmailProvider } from './services/email-provider.js';
+import { createConfirmationEmailService } from './services/confirmation-email.js';
 
 const razorpayKeyId = defineSecret('RAZORPAY_KEY_ID');
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
 const razorpayWebhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
 const ticketSigningSecret = defineSecret('TICKET_SIGNING_SECRET');
+const emailApiKey = defineSecret('EMAIL_API_KEY');
+const emailFrom = defineString('EMAIL_FROM');
+const publicBaseUrl = defineString('PUBLIC_BASE_URL');
 
 const createRegistration = createRegistrationService({ db });
 const expirationService = createExpirationService({ db });
@@ -34,8 +39,23 @@ const ticketService = createTicketService({
   db,
   getSigningSecret: () => ticketSigningSecret.value(),
 });
+const confirmationEmailService = createConfirmationEmailService({
+  db,
+  ticketService,
+  provider: createResendEmailProvider({
+    getApiKey: () => emailApiKey.value(),
+    getFrom: () => emailFrom.value(),
+  }),
+  getPublicBaseUrl: () => publicBaseUrl.value(),
+  logger,
+});
 const paymentService = createPaymentService({
-  db, razorpay, getKeySecret: () => razorpayKeySecret.value(), ticketService, logger,
+  db,
+  razorpay,
+  getKeySecret: () => razorpayKeySecret.value(),
+  ticketService,
+  confirmationEmailService,
+  logger,
 });
 const webhookService = createWebhookService({
   paymentService,
@@ -46,6 +66,7 @@ const adminRouter = createAdminRouter({
   authorizeAdmin: createAdminAuthorization({ auth, db }),
   reportingService: createAdminReportingService({ db }),
   checkinService: createCheckinService({ db, ticketService }),
+  confirmationEmailService,
 });
 
 export const api = onRequest(
@@ -53,7 +74,13 @@ export const api = onRequest(
     region: 'asia-south1',
     timeoutSeconds: 30,
     memory: '256MiB',
-    secrets: [razorpayKeyId, razorpayKeySecret, razorpayWebhookSecret, ticketSigningSecret],
+    secrets: [
+      razorpayKeyId,
+      razorpayKeySecret,
+      razorpayWebhookSecret,
+      ticketSigningSecret,
+      emailApiKey,
+    ],
   },
   createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger }),
 );

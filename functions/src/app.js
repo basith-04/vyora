@@ -13,6 +13,16 @@ function registrationIdFromBody(body) {
   return body.registrationId;
 }
 
+function ticketViewTokenFromBody(body) {
+  if (
+    !body || typeof body !== 'object' || Array.isArray(body)
+    || Object.keys(body).length !== 1 || typeof body.ticketViewToken !== 'string'
+  ) {
+    throw new AppError('TICKET_VIEW_INVALID', 'A valid ticket link is required.', 400);
+  }
+  return body.ticketViewToken;
+}
+
 export function createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger = console }) {
   const app = express();
   app.disable('x-powered-by');
@@ -92,6 +102,15 @@ export function createApp({ checkoutService, paymentService, webhookService, tic
     try {
       const registrationId = registrationIdFromBody(request.body);
       const data = await ticketService.participantTicket(registrationId, registrationTokenHash(request));
+      response.status(200).json({ data });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/tickets/view', async (request, response, next) => {
+    try {
+      const data = await ticketService.viewByToken(ticketViewTokenFromBody(request.body));
       response.status(200).json({ data });
     } catch (error) {
       next(error);

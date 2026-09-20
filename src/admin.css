@@ -129,6 +129,7 @@
 .manual-checkin form, .manual-checkin label { display: grid; gap: .6rem; }
 .manual-checkin label { color: #526a6c; font-size: .68rem; text-transform: uppercase; }
 .manual-checkin textarea { resize: vertical; overflow-wrap: anywhere; }
+.email-retry-button { margin-top: .8rem; min-height: 40px; padding: .6rem .8rem; font-size: .68rem; }
 
 @media (max-width: 980px) {
   .admin-filters { grid-template-columns: repeat(3, minmax(120px, 1fr)); }

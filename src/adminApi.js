@@ -53,3 +53,8 @@ export const submitCheckin = (auth, input) => adminRequest(auth, '/api/admin/che
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(input),
 });
+export const retryConfirmationEmail = (auth, registrationId) => adminRequest(
+  auth,
+  `/api/admin/registrations/${encodeURIComponent(registrationId)}/confirmation-email/retry`,
+  { method: 'POST' },
+);

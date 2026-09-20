@@ -9,6 +9,7 @@ import { createExpirationService } from '../../src/services/expiration.js';
 import { createCheckoutService } from '../../src/services/checkout.js';
 import { createPaymentService } from '../../src/services/payment.js';
 import { DEFAULT_CONFIGURATION } from '../../src/config/constants.js';
+import { createTicketService } from '../../src/services/ticket.js';
 
 const projectId = process.env.GCLOUD_PROJECT || 'demo-vyora-26';
 const recoveryTokenHash = 'a'.repeat(64);
@@ -86,9 +87,9 @@ async function createReadyRegistration(gateway = fakeGateway()) {
   return { result, gateway, expirationService };
 }
 
-function paymentService(gateway, clock = () => creationTime + 60_000) {
+function paymentService(gateway, clock = () => creationTime + 60_000, ticketService = null) {
   return createPaymentService({
-    db, razorpay: gateway, getKeySecret: () => keySecret, clock, logger: { error() {} },
+    db, razorpay: gateway, getKeySecret: () => keySecret, ticketService, clock, logger: { error() {} },
   });
 }
 
@@ -222,6 +223,37 @@ test('valid verification confirms once without changing capacity', async () => {
   assert.equal(registration.paymentStatus, 'PAID');
   assert.equal(registration.registrationStatus, 'CONFIRMED');
   assert.equal((await db.collection('payments').get()).size, 1);
+});
+
+test('payment confirmation best-effort issues exactly one ticket without changing payment truth', async () => {
+  const { result, gateway } = await createReadyRegistration();
+  const tickets = createTicketService({
+    db,
+    getSigningSecret: () => 'phase4-payment-ticket-signing-secret-value',
+    clock: () => creationTime + 60_000,
+  });
+  const service = paymentService(gateway, () => creationTime + 60_000, tickets);
+  const first = await verify(service, result, 'pay_ticket');
+  const second = await verify(service, result, 'pay_ticket');
+  assert.equal(first.registrationStatus, 'CONFIRMED');
+  assert.equal(first.ticketIssued, true);
+  assert.equal(second.ticketIssued, true);
+  assert.equal((await db.collection('tickets').get()).size, 1);
+  assert.equal((await db.collection('payments').get()).size, 1);
+});
+
+test('ticket issuance failure never rolls back a valid confirmed payment', async () => {
+  const { result, gateway } = await createReadyRegistration();
+  const service = paymentService(gateway, () => creationTime + 60_000, {
+    issueForRegistrationRef: async () => { throw new Error('simulated ticket outage'); },
+  });
+  const verified = await verify(service, result, 'pay_ticket_outage');
+  assert.equal(verified.registrationStatus, 'CONFIRMED');
+  assert.equal(verified.ticketIssued, false);
+  const registration = (await db.collection('registrations').limit(1).get()).docs[0].data();
+  assert.equal(registration.registrationStatus, 'CONFIRMED');
+  assert.equal(registration.paymentStatus, 'PAID');
+  assert.equal((await db.collection('tickets').get()).size, 0);
 });
 
 test('invalid signature, wrong order association, and amount mismatch never confirm', async () => {

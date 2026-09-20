@@ -10,6 +10,8 @@ import { createAdminAuthorization } from '../../src/middleware/admin-auth.js';
 import { createAdminReportingService } from '../../src/services/admin-reporting.js';
 import { createAdminRouter } from '../../src/routes/admin.js';
 import { DEFAULT_CONFIGURATION } from '../../src/config/constants.js';
+import { createTicketService } from '../../src/services/ticket.js';
+import { createCheckinService } from '../../src/services/checkin.js';
 
 const projectId = process.env.GCLOUD_PROJECT || 'demo-vyora-26';
 let adminApp;
@@ -17,6 +19,7 @@ let db;
 let auth;
 let app;
 let testEnvironment;
+let ticketService;
 
 const noopServices = {
   checkoutService: { start: async () => ({}), retry: async () => ({}), status: async () => ({}) },
@@ -70,11 +73,18 @@ before(async () => {
   db = getFirestore(adminApp);
   auth = getAuth(adminApp);
   testEnvironment = await initializeTestEnvironment({ projectId });
+  ticketService = createTicketService({
+    db,
+    getSigningSecret: () => 'phase4-admin-test-ticket-signing-secret-value',
+    clock: () => Date.parse('2026-09-19T11:00:00.000Z'),
+  });
   app = createApp({
     ...noopServices,
+    ticketService,
     adminRouter: createAdminRouter({
       authorizeAdmin: createAdminAuthorization({ auth, db }),
       reportingService: createAdminReportingService({ db }),
+      checkinService: createCheckinService({ db, ticketService, clock: () => Date.parse('2026-09-19T11:05:00.000Z') }),
     }),
     logger: { error() {} },
   });
@@ -145,4 +155,26 @@ test('CSV export requires authorization and neutralizes participant formulas', a
   assert.match(response.text, /"registrationId","fullName"/);
   assert.match(response.text, /"'@Formula"/);
   assert.match(response.text, /"Admin, Test"/);
+});
+
+test('check-in API requires staff authorization and ignores no client-supplied staff identity', async () => {
+  const registrationRef = db.doc('registrations/reg-1');
+  const issued = await ticketService.issueForRegistrationRef(registrationRef);
+  assert.equal((await request(app).post('/api/admin/check-ins').send({ ticketToken: issued.ticketPayload, type: 'EVENT' })).status, 401);
+
+  const { user, token } = await createIdentity('checkin@example.com');
+  await db.doc(`admins/${user.uid}`).set({ name: 'Entrance Staff', email: user.email, role: 'COORDINATOR', active: true });
+  const spoof = await request(app).post('/api/admin/check-ins').set('Authorization', `Bearer ${token}`).send({
+    ticketToken: issued.ticketPayload, type: 'EVENT', checkedInBy: 'spoofed-uid',
+  });
+  assert.equal(spoof.status, 400);
+  assert.equal(spoof.body.error.code, 'INVALID_CHECKIN_REQUEST');
+
+  const valid = await request(app).post('/api/admin/check-ins').set('Authorization', `Bearer ${token}`).send({
+    ticketToken: issued.ticketPayload, type: 'EVENT',
+  });
+  assert.equal(valid.status, 200);
+  assert.equal(valid.body.data.outcome, 'CHECKED_IN');
+  const stored = (await db.collection('checkins').limit(1).get()).docs[0].data();
+  assert.equal(stored.checkedInBy, user.uid);
 });

@@ -33,6 +33,7 @@ const AUTHORITATIVE_FIELDS = new Set([
   'cancelledAt',
   'ticketIssued',
   'ticketId',
+  'confirmationEmail',
 ]);
 
 export function normalizeFullName(value) {

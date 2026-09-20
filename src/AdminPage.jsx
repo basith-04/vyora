@@ -3,7 +3,7 @@ import { getAdminAuth } from './firebaseClient.js';
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 import {
   downloadRegistrationsCsv, loadAdminProfile, loadDashboard, loadRegistration,
-  loadRegistrations,
+  loadRegistrations, retryConfirmationEmail,
 } from './adminApi.js';
 import {
   defaultFilters, filterRegistrations, formatDate, hostelLabels, readableStatus,
@@ -182,7 +182,7 @@ function AccommodationView({ dashboard, registrations, onOpen }) {
   </div></section><section className="admin-panel"><div className="panel-heading"><h2>Accommodation participants</h2><span>{active.length} active records</span></div><div className="summary-list">{active.map((item) => <button key={item.registrationId} type="button" onClick={() => onOpen(item.registrationId)}><span><strong>{item.fullName}</strong><small>{item.isHosteller ? hostelLabels[item.hostel] : `${readableStatus(item.stayType)} stay requested`} · {item.registrationId}</small></span><StatusBadge value={item.registrationStatus} /></button>)}</div></section></div>;
 }
 
-function Detail({ registration, loading, onClose }) {
+function Detail({ registration, loading, onClose, onRetryEmail, emailRetrying }) {
   return <div className="detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="registration-detail-title">
     <button className="detail-close" type="button" aria-label="Close registration detail" onClick={onClose}>×</button>
     {loading ? <div className="admin-loading">Loading registration…</div> : registration && <>
@@ -194,6 +194,7 @@ function Detail({ registration, loading, onClose }) {
       <div className="detail-section"><h3>Pricing & payment</h3><dl><dt>Base fee</dt><dd>₹{registration.baseFee}</dd><dt>Stay fee</dt><dd>₹{registration.stayFee}</dd><dt>Total</dt><dd>₹{registration.totalFee}</dd><dt>Payment</dt><dd><StatusBadge value={registration.paymentStatus} /></dd><dt>Registration</dt><dd><StatusBadge value={registration.registrationStatus} /></dd><dt>Razorpay order</dt><dd className="breakable">{registration.razorpayOrderId || '—'}</dd><dt>Razorpay payment</dt><dd className="breakable">{registration.razorpayPaymentId || registration.payment?.razorpayPaymentId || '—'}</dd><dt>Gateway status</dt><dd>{readableStatus(registration.payment?.status)}</dd><dt>Gateway amount</dt><dd>{registration.payment?.amount != null ? `₹${(registration.payment.amount / 100).toFixed(2)} ${registration.payment.currency || ''}` : '—'}</dd><dt>Reconciliation</dt><dd>{registration.paymentReconciliationRequired ? 'Required' : 'Not required'}</dd><dt>Reason</dt><dd>{readableStatus(registration.payment?.reconciliationReason)}</dd><dt>Payment completed</dt><dd>{formatDate(registration.paymentCompletedAt)}</dd></dl></div>
       <div className="detail-section"><h3>Reservation timeline</h3><dl><dt>Created</dt><dd>{formatDate(registration.createdAt)}</dd><dt>Reservation expiry</dt><dd>{formatDate(registration.seatReservationExpiresAt)}</dd><dt>Capacity released</dt><dd>{registration.capacityReleased ? 'Yes' : 'No'}</dd><dt>Confirmed</dt><dd>{formatDate(registration.confirmedAt)}</dd><dt>Expired</dt><dd>{formatDate(registration.expiredAt)}</dd></dl></div>
       <div className="detail-section"><h3>Attendance</h3><dl><dt>Event check-in</dt><dd>{formatDate(registration.attendance?.event?.checkedInAt)}</dd><dt>Event staff</dt><dd>{registration.attendance?.event?.checkedInByName || registration.attendance?.event?.checkedInBy || '—'}</dd><dt>Workshop check-in</dt><dd>{formatDate(registration.attendance?.workshop?.checkedInAt)}</dd><dt>Workshop</dt><dd>{workshopLabels[registration.attendance?.workshop?.workshopId] || '—'}</dd><dt>Workshop staff</dt><dd>{registration.attendance?.workshop?.checkedInByName || registration.attendance?.workshop?.checkedInBy || '—'}</dd></dl></div>
+      <div className="detail-section"><h3>Confirmation email</h3><dl><dt>Status</dt><dd><StatusBadge value={registration.confirmationEmail?.status || 'PENDING'} /></dd><dt>Sent</dt><dd>{formatDate(registration.confirmationEmail?.sentAt)}</dd><dt>Last attempt</dt><dd>{formatDate(registration.confirmationEmail?.lastAttemptAt)}</dd><dt>Attempts</dt><dd>{registration.confirmationEmail?.attempts ?? 0} / 3</dd><dt>Last error</dt><dd>{readableStatus(registration.confirmationEmail?.lastErrorCode)}</dd></dl>{registration.registrationStatus === 'CONFIRMED' && ['PENDING', 'FAILED', 'SENDING'].includes(registration.confirmationEmail?.status || 'PENDING') && registration.confirmationEmail?.attempts < 3 && <button className="email-retry-button" type="button" disabled={emailRetrying} onClick={() => onRetryEmail(registration.registrationId)}>{emailRetrying ? 'RETRYING…' : 'RETRY CONFIRMATION EMAIL'}</button>}</div>
     </>}
   </aside></div>;
 }
@@ -210,6 +211,7 @@ export default function AdminPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [emailRetrying, setEmailRetrying] = useState(false);
 
   useEffect(() => {
     let instance;
@@ -261,6 +263,18 @@ export default function AdminPage() {
     const path = nextView === 'checkin' ? '/admin/check-in' : '/admin';
     if (window.location.pathname !== path) window.history.pushState(window.history.state, '', path);
   };
+  const retryEmail = async (registrationId) => {
+    setEmailRetrying(true); setMessage('');
+    try {
+      const result = await retryConfirmationEmail(auth, registrationId);
+      setMessage(result.outcome === 'SENT' ? 'Confirmation email sent.' : `Confirmation email status: ${result.outcome}.`);
+      setDetail(await loadRegistration(auth, registrationId));
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setEmailRetrying(false);
+    }
+  };
 
   if (state === 'configuration-error') return <main className="admin-center-state"><h1>Admin configuration required</h1><p>{message}</p></main>;
   if (state === 'authenticating' || user === undefined) return <main className="admin-center-state"><div className="admin-spinner" /><p>Authenticating staff session…</p></main>;
@@ -280,6 +294,6 @@ export default function AdminPage() {
       {view === 'accommodation' && <AccommodationView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'checkin' && <CheckInView auth={auth} />}
     </main>
-    {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} />}
+    {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} onRetryEmail={retryEmail} emailRetrying={emailRetrying} />}
   </div>;
 }

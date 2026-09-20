@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import desktopHero from '../assets/hero-vjec-desktop.png';
 import mobileHero from '../assets/hero-vjec-mobile.png';
+import TicketPage from './TicketPage.jsx';
 import standingAdventurer from '../assets/vyora-adventurer-standing.png';
 import ProgramPage from './ProgramPage.jsx';
 import TracksPage from './TracksPage.jsx';
@@ -237,9 +238,10 @@ function ChapterBoundary() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
+  const isTicket = activePath === '/ticket';
   const isAdmin = activePath === '/admin' || activePath === '/admin/check-in';
   const isPolicy = informationPaths.has(activePath);
-  const isStandalone = isRegistration || isPolicy || isAdmin;
+  const isStandalone = isRegistration || isTicket || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);
 
   useEffect(() => {
@@ -251,8 +253,8 @@ export default function App() {
       '/cancellation-and-refund': "Cancellation & Refund Policy | VYORA '26",
       '/shipping-and-delivery': "Shipping & Delivery Policy | VYORA '26",
     };
-    document.title = isAdmin ? "STAFF CONSOLE — VYORA '26" : isRegistration ? "REGISTRATION.EXE — VYORA '26" : titles[activePath] || "VYORA '26 — A Brighter Tomorrow";
-  }, [activePath, isAdmin, isRegistration]);
+    document.title = isAdmin ? "STAFF CONSOLE — VYORA '26" : isRegistration ? "REGISTRATION.EXE — VYORA '26" : isTicket ? "YOUR TICKET — VYORA '26" : titles[activePath] || "VYORA '26 — A Brighter Tomorrow";
+  }, [activePath, isAdmin, isRegistration, isTicket]);
 
   if (isAdmin) return <AdminPage />;
 
@@ -261,7 +263,7 @@ export default function App() {
       <div className={`app-shell${isRegistration ? '' : ' public-app-shell'}`}>
         <WindowChrome />
         <Navbar activeSection={activeSection} isRegistration={isRegistration} isStandalone={isStandalone} onSectionNavigate={onSectionNavigate} />
-        {isRegistration ? <RegistrationPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
+        {isRegistration ? <RegistrationPage /> : isTicket ? <TicketPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
           <HomeHero />
           <ChapterBoundary />
           <ProgramPage />

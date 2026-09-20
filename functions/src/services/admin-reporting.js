@@ -5,12 +5,76 @@ import { createCsv } from '../utils/csv.js';
 const REGISTRATION_STATES = ['PAYMENT_PENDING', 'CONFIRMED', 'PAYMENT_FAILED', 'EXPIRED', 'CANCELLED'];
 const PAYMENT_STATES = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
 const YEAR_VALUES = [1, 2, 3, 4];
-const HOSTELS = ['SANJOSE', 'SANTHOME', 'HOLY_CROSS', 'ALPHONSA'];
+const HOSTELS = ['SANJOSE', 'SANTHOME', 'HOLY_CROSS', 'ALPHONSA', 'PG_HOUSE_NEAR_COLLEGE'];
 const WORKSHOP_NAMES = {
   'data-science': 'Data Science and Analytics using Python',
   'ai-ml-data': 'AI / ML / Data',
   'github-ai': 'GitHub × AI',
 };
+
+const EXPORT_FILTER_VALUES = Object.freeze({
+  registrationStatus: new Set(REGISTRATION_STATES),
+  paymentStatus: new Set(PAYMENT_STATES),
+  year: new Set(YEAR_VALUES.map(String)),
+  ieee: new Set(['true', 'false']),
+  workshopId: new Set(WORKSHOP_IDS),
+  hosteller: new Set(['true', 'false']),
+  hostel: new Set(HOSTELS),
+  stay: new Set(['true', 'false']),
+  stayType: new Set(['AC', 'NON_AC']),
+  reconciliation: new Set(['true', 'false']),
+  eventCheckin: new Set(['true', 'false']),
+  workshopCheckin: new Set(['true', 'false']),
+});
+
+export function normalizeExportFilters(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new AppError('INVALID_ADMIN_FILTERS', 'CSV export filters are invalid.', 400);
+  }
+  const allowed = new Set(['search', ...Object.keys(EXPORT_FILTER_VALUES)]);
+  if (Object.keys(input).some((key) => !allowed.has(key))) {
+    throw new AppError('INVALID_ADMIN_FILTERS', 'CSV export filters are invalid.', 400);
+  }
+  const result = { search: '' };
+  for (const [key, rawValue] of Object.entries(input)) {
+    if (Array.isArray(rawValue) || (typeof rawValue !== 'string' && rawValue != null)) {
+      throw new AppError('INVALID_ADMIN_FILTERS', 'CSV export filters are invalid.', 400);
+    }
+    const value = String(rawValue || '').trim();
+    if (!value) continue;
+    if (key === 'search') {
+      if (value.length > 200) throw new AppError('INVALID_ADMIN_FILTERS', 'CSV export search is too long.', 400);
+      result.search = value;
+    } else if (!EXPORT_FILTER_VALUES[key].has(value)) {
+      throw new AppError('INVALID_ADMIN_FILTERS', 'CSV export filters are invalid.', 400);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+export function filterRegistrationsForExport(registrations, input = {}) {
+  const filters = normalizeExportFilters(input);
+  const needle = filters.search.toLocaleLowerCase();
+  return registrations.filter((item) => {
+    if (needle && ![item.registrationId, item.fullName, item.email, item.phone, item.department, item.class]
+      .some((value) => String(value || '').toLocaleLowerCase().includes(needle))) return false;
+    if (filters.registrationStatus && item.registrationStatus !== filters.registrationStatus) return false;
+    if (filters.paymentStatus && item.paymentStatus !== filters.paymentStatus) return false;
+    if (filters.year && String(item.year) !== filters.year) return false;
+    if (filters.ieee && String(item.ieeeMember) !== filters.ieee) return false;
+    if (filters.workshopId && item.workshopId !== filters.workshopId) return false;
+    if (filters.hosteller && String(item.isHosteller) !== filters.hosteller) return false;
+    if (filters.hostel && item.hostel !== filters.hostel) return false;
+    if (filters.stay && String(item.needsStay) !== filters.stay) return false;
+    if (filters.stayType && item.stayType !== filters.stayType) return false;
+    if (filters.reconciliation && String(item.paymentReconciliationRequired) !== filters.reconciliation) return false;
+    if (filters.eventCheckin && String(Boolean(item.attendance?.event)) !== filters.eventCheckin) return false;
+    if (filters.workshopCheckin && String(Boolean(item.attendance?.workshop)) !== filters.workshopCheckin) return false;
+    return true;
+  });
+}
 
 function iso(value) {
   if (!value) return null;
@@ -285,8 +349,9 @@ export function createAdminReportingService({ db }) {
       return registration;
     },
 
-    async csv() {
-      return registrationsCsv((await readRegistrationsAndPayments()).registrations);
+    async csv(filters = {}) {
+      const registrations = (await readRegistrationsAndPayments()).registrations;
+      return registrationsCsv(filterRegistrationsForExport(registrations, filters));
     },
   };
 }

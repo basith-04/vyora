@@ -37,3 +37,11 @@ export function createAdminAuthorization({ auth, db }) {
     }
   };
 }
+
+export function requireAdminRole(request, response, next) {
+  if (request.admin?.role !== 'ADMIN') {
+    next(new AppError('FORBIDDEN', 'Administrator access is required for this operation.', 403));
+    return;
+  }
+  next();
+}

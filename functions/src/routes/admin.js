@@ -1,7 +1,9 @@
 import { Router } from 'express';
+import { requireAdminRole } from '../middleware/admin-auth.js';
 
 export function createAdminRouter({
   authorizeAdmin, reportingService, checkinService, confirmationEmailService,
+  manualReconciliationService,
 }) {
   const router = Router();
   router.use(authorizeAdmin);
@@ -41,7 +43,7 @@ export function createAdminRouter({
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': 'attachment; filename="vyora-26-registrations.csv"',
       });
-      response.status(200).send(`\uFEFF${await reportingService.csv()}`);
+      response.status(200).send(`\uFEFF${await reportingService.csv(request.query)}`);
     } catch (error) {
       next(error);
     }
@@ -66,6 +68,24 @@ export function createAdminRouter({
         next(error);
       }
     });
+  }
+
+  if (manualReconciliationService) {
+    router.post(
+      '/registrations/:registrationId/reconcile-payment',
+      requireAdminRole,
+      async (request, response, next) => {
+        try {
+          const data = await manualReconciliationService.reconcile(
+            request.params.registrationId,
+            request.admin,
+          );
+          response.status(200).json({ data });
+        } catch (error) {
+          next(error);
+        }
+      },
+    );
   }
 
   return router;

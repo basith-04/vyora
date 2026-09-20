@@ -25,6 +25,7 @@ export const HOSTELS = Object.freeze([
   'SANTHOME',
   'HOLY_CROSS',
   'ALPHONSA',
+  'PG_HOUSE_NEAR_COLLEGE',
 ]);
 
 export const STAY_TYPES = Object.freeze(['AC', 'NON_AC']);
@@ -81,7 +82,7 @@ export const DEFAULT_CONFIGURATION = Object.freeze({
         ac: 300,
       },
     },
-    reservationDurationSeconds: 300,
+    reservationDurationSeconds: 900,
   },
   workshops: {
     'data-science': {

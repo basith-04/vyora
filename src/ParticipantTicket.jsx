@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { renderTicketQr } from './ticketQr.js';
 import { workshopLabels } from './adminData.js';
+import { downloadFullTicket } from './ticketImage.js';
 
 export default function ParticipantTicket({ ticket, loading, error, onRetry }) {
   const [qrImage, setQrImage] = useState('');
   const [qrError, setQrError] = useState('');
+  const [downloadState, setDownloadState] = useState('idle');
 
   useEffect(() => {
     let active = true;
@@ -21,6 +23,16 @@ export default function ParticipantTicket({ ticket, loading, error, onRetry }) {
   if (error || qrError) return <section className="participant-ticket ticket-error" role="alert"><strong>TICKET TEMPORARILY UNAVAILABLE</strong><p>{error || qrError}</p><button type="button" onClick={onRetry}>LOAD TICKET AGAIN</button></section>;
   if (!ticket) return null;
 
+  const download = async () => {
+    setDownloadState('loading');
+    try {
+      await downloadFullTicket(ticket);
+      setDownloadState('idle');
+    } catch {
+      setDownloadState('error');
+    }
+  };
+
   return <section className="participant-ticket" aria-labelledby="participant-ticket-title">
     <div className="ticket-header"><span>VYORA '26</span><strong id="participant-ticket-title">ENTRY TICKET</strong><small>09—10 OCT 2026 · VJEC CHEMPERI</small></div>
     <div className="ticket-body">
@@ -28,6 +40,7 @@ export default function ParticipantTicket({ ticket, loading, error, onRetry }) {
       <div className="ticket-qr">{qrImage ? <img src={qrImage} alt={`QR ticket for ${ticket.participant.fullName}`} /> : <div className="ticket-spinner" aria-label="Rendering QR code" />}</div>
     </div>
     <div className="ticket-instructions"><strong>SHOW THIS QR AT THE EVENT ENTRANCE.</strong><span>Use the same QR code for workshop check-in. Save it or take a screenshot before arriving.</span></div>
-    {qrImage && <a className="ticket-download" href={qrImage} download={`VYORA26-${ticket.participant.registrationId}-ticket.png`}>SAVE QR IMAGE ↓</a>}
+    {qrImage && <button className="ticket-download" type="button" disabled={downloadState === 'loading'} onClick={download}>{downloadState === 'loading' ? 'GENERATING TICKET…' : 'DOWNLOAD TICKET ↓'}</button>}
+    {downloadState === 'error' && <p className="ticket-download-error" role="alert">The ticket image could not be generated. Try again or save a screenshot.</p>}
   </section>;
 }

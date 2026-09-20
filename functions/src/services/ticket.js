@@ -5,6 +5,7 @@ import { COLLECTIONS, PAYMENT_STATUS, REGISTRATION_STATUS } from '../config/cons
 import { getAuthorizedRegistration } from './registration-access.js';
 
 const PAYLOAD_PREFIX = 'vyora26:t:';
+const VIEW_TOKEN_PREFIX = 'vyora26:v:';
 
 function asTimestamp(now) {
   return Timestamp.fromMillis(typeof now === 'number' ? now : now.getTime());
@@ -25,12 +26,23 @@ export function ticketPayloadForRegistration(registrationDocId, secret) {
   return `${PAYLOAD_PREFIX}${credential}`;
 }
 
+export function ticketViewTokenForRegistration(registrationDocId, secret) {
+  const credential = createHmac('sha256', secret)
+    .update(`vyora26:ticket-view:v1:${registrationDocId}`)
+    .digest('base64url');
+  return `${VIEW_TOKEN_PREFIX}${credential}`;
+}
+
 export function ticketTokenHash(payload) {
   return createHash('sha256').update(payload).digest('hex');
 }
 
 export function isTicketPayload(value) {
   return typeof value === 'string' && /^vyora26:t:[A-Za-z0-9_-]{43}$/.test(value);
+}
+
+export function isTicketViewToken(value) {
+  return typeof value === 'string' && /^vyora26:v:[A-Za-z0-9_-]{43}$/.test(value);
 }
 
 function ticketId(random = randomBytes) {
@@ -54,7 +66,27 @@ export function createTicketService({
 }) {
   function derived(registrationDocId) {
     const payload = ticketPayloadForRegistration(registrationDocId, signingSecret(getSigningSecret));
-    return { payload, hash: ticketTokenHash(payload) };
+    const viewToken = ticketViewTokenForRegistration(registrationDocId, signingSecret(getSigningSecret));
+    return {
+      payload,
+      hash: ticketTokenHash(payload),
+      viewToken,
+      viewTokenHash: ticketTokenHash(viewToken),
+    };
+  }
+
+  function participantResponse(result) {
+    return {
+      ticketId: result.ticket.ticketId,
+      ticketPayload: result.ticketPayload,
+      issuedAt: result.ticket.issuedAt.toDate().toISOString(),
+      participant: {
+        fullName: result.registration.fullName,
+        registrationId: result.registration.registrationId,
+        ieeeMember: result.registration.ieeeMember === true,
+        workshopId: result.registration.workshopId,
+      },
+    };
   }
 
   async function issueForRegistrationRef(registrationRef) {
@@ -73,6 +105,13 @@ export function createTicketService({
         if (existing.registrationDocId !== registrationRef.id || existing.qrTokenHash !== credential.hash) {
           throw configurationError('The stored ticket does not match the configured ticket credential.');
         }
+        if (existing.viewTokenHash && existing.viewTokenHash !== credential.viewTokenHash) {
+          throw configurationError('The stored ticket view credential does not match the configured ticket credential.');
+        }
+        if (!existing.viewTokenHash) {
+          transaction.update(ticketRef, { viewTokenHash: credential.viewTokenHash });
+          existing.viewTokenHash = credential.viewTokenHash;
+        }
         if (registration.ticketIssued !== true || registration.ticketId !== existing.ticketId) {
           transaction.update(registrationRef, {
             ticketIssued: true,
@@ -89,6 +128,7 @@ export function createTicketService({
         registrationDocId: registrationRef.id,
         registrationId: registration.registrationId,
         qrTokenHash: credential.hash,
+        viewTokenHash: credential.viewTokenHash,
         active: true,
         issuedAt,
       };
@@ -100,22 +140,85 @@ export function createTicketService({
       });
       return { ticket, registration, created: true };
     });
-    return { ...result, ticketPayload: credential.payload };
+    return { ...result, ticketPayload: credential.payload, ticketViewToken: credential.viewToken };
   }
 
   async function participantTicket(registrationId, recoveryTokenHash) {
     const { ref } = await getAuthorizedRegistration(db, registrationId, recoveryTokenHash);
     const result = await issueForRegistrationRef(ref);
+    return participantResponse(result);
+  }
+
+  async function existingForRegistrationRef(registrationRef) {
+    const [registrationSnapshot, ticketSnapshot] = await Promise.all([
+      registrationRef.get(),
+      db.collection(COLLECTIONS.tickets).doc(registrationRef.id).get(),
+    ]);
+    if (!registrationSnapshot.exists || !ticketSnapshot.exists) {
+      throw new AppError('TICKET_NOT_AVAILABLE', 'The confirmed ticket has not been issued yet.', 409);
+    }
+    const registration = registrationSnapshot.data();
+    const ticket = ticketSnapshot.data();
+    assertConfirmed(registration);
+    const credential = derived(registrationRef.id);
+    if (
+      ticket.active !== true
+      || ticket.registrationDocId !== registrationRef.id
+      || ticket.registrationId !== registration.registrationId
+      || ticket.qrTokenHash !== credential.hash
+      || ticket.viewTokenHash !== credential.viewTokenHash
+      || registration.ticketIssued !== true
+      || registration.ticketId !== ticket.ticketId
+    ) {
+      throw new AppError('TICKET_NOT_AVAILABLE', 'The confirmed ticket is not available.', 409);
+    }
     return {
-      ticketId: result.ticket.ticketId,
-      ticketPayload: result.ticketPayload,
-      issuedAt: result.ticket.issuedAt.toDate().toISOString(),
-      participant: {
-        fullName: result.registration.fullName,
-        registrationId: result.registration.registrationId,
-        workshopId: result.registration.workshopId,
-      },
+      ticket,
+      registration,
+      created: false,
+      ticketPayload: credential.payload,
+      ticketViewToken: credential.viewToken,
     };
+  }
+
+  async function viewByToken(viewToken) {
+    if (!isTicketViewToken(viewToken)) {
+      throw new AppError('TICKET_VIEW_INVALID', 'The ticket link is invalid.', 404);
+    }
+    const viewTokenHash = ticketTokenHash(viewToken);
+    const snapshot = await db.collection(COLLECTIONS.tickets)
+      .where('viewTokenHash', '==', viewTokenHash)
+      .limit(2)
+      .get();
+    if (snapshot.size !== 1) {
+      throw new AppError('TICKET_VIEW_INVALID', 'The ticket link is invalid.', 404);
+    }
+    const ticketDocument = snapshot.docs[0];
+    const ticket = ticketDocument.data();
+    const stored = Buffer.from(ticket.viewTokenHash, 'hex');
+    const supplied = Buffer.from(viewTokenHash, 'hex');
+    if (stored.length !== supplied.length || !timingSafeEqual(stored, supplied)) {
+      throw new AppError('TICKET_VIEW_INVALID', 'The ticket link is invalid.', 404);
+    }
+    const registrationSnapshot = await db.collection(COLLECTIONS.registrations)
+      .doc(ticket.registrationDocId)
+      .get();
+    if (!registrationSnapshot.exists) {
+      throw new AppError('TICKET_VIEW_INVALID', 'The ticket link is invalid.', 404);
+    }
+    const registration = registrationSnapshot.data();
+    assertConfirmed(registration);
+    const credential = derived(ticket.registrationDocId);
+    if (
+      ticket.active !== true
+      || ticket.qrTokenHash !== credential.hash
+      || registration.ticketIssued !== true
+      || registration.ticketId !== ticket.ticketId
+      || ticket.registrationId !== registration.registrationId
+    ) {
+      throw new AppError('TICKET_VIEW_INVALID', 'The ticket link is invalid.', 404);
+    }
+    return participantResponse({ ticket, registration, ticketPayload: credential.payload });
   }
 
   async function findByPayload(payload) {
@@ -139,5 +242,11 @@ export function createTicketService({
     return { ref: document.ref, data: document.data() };
   }
 
-  return { issueForRegistrationRef, participantTicket, findByPayload };
+  return {
+    issueForRegistrationRef,
+    existingForRegistrationRef,
+    participantTicket,
+    viewByToken,
+    findByPayload,
+  };
 }

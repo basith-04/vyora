@@ -2,15 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import { AppError } from '../errors.js';
 import {
+  COLLECTIONS,
   ORDER_CREATION_STATUS,
   REGISTRATION_STATUS,
+  SYSTEM_DOCUMENTS,
 } from '../config/constants.js';
 import {
   findRegistrationByRecoveryToken,
   getAuthorizedRegistration,
+  registrationHasRecoveryToken,
 } from './registration-access.js';
 
 const CURRENCY = 'INR';
+const CAPACITY_ERRORS = new Set(['EVENT_FULL', 'FIRST_YEAR_FULL', 'WORKSHOP_FULL', 'WORKSHOP_UNAVAILABLE']);
 
 function asTimestamp(now) {
   return Timestamp.fromMillis(typeof now === 'number' ? now : now.getTime());
@@ -84,9 +88,24 @@ export function createCheckoutService({
   createRegistration,
   expirationService,
   razorpay,
+  paymentService = null,
   clock = () => Date.now(),
   logger = console,
 }) {
+  const registrationConfigRef = db.collection(COLLECTIONS.system)
+    .doc(SYSTEM_DOCUMENTS.registrationConfig);
+
+  function requireRegistrationOpen(snapshot) {
+    if (!snapshot.exists || snapshot.data()?.registrationOpen !== true) {
+      throw new AppError('REGISTRATION_CLOSED', 'Registration is currently closed.', 409);
+    }
+  }
+
+  async function assertRegistrationOpen() {
+    const snapshot = await registrationConfigRef.get();
+    requireRegistrationOpen(snapshot);
+  }
+
   async function expireIfDue(ref, registration) {
     if (
       registration.registrationStatus === REGISTRATION_STATUS.paymentPending
@@ -113,7 +132,7 @@ export function createCheckoutService({
       const snapshot = await transaction.get(ref);
       if (!snapshot.exists) throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
       const registration = snapshot.data();
-      if (registration.recoveryTokenHash !== expected.recoveryTokenHash) {
+      if (!registrationHasRecoveryToken(registration, expected.recoveryTokenHash)) {
         throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
       }
       if (
@@ -153,10 +172,11 @@ export function createCheckoutService({
 
   async function ensureOrder(ref, recoveryTokenHash) {
     const claim = await db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(ref);
+      const [snapshot, configSnapshot] = await transaction.getAll(ref, registrationConfigRef);
+      requireRegistrationOpen(configSnapshot);
       if (!snapshot.exists) throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
       const registration = snapshot.data();
-      if (registration.recoveryTokenHash !== recoveryTokenHash) {
+      if (!registrationHasRecoveryToken(registration, recoveryTokenHash)) {
         throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
       }
       if (
@@ -213,6 +233,9 @@ export function createCheckoutService({
         throw new AppError('PAYMENT_ORDER_IN_PROGRESS', 'The payment order is still being prepared.', 409);
       }
       if (!order) {
+        // The registration transaction and the external Razorpay request cannot be atomic.
+        // Re-read the switch at the last possible point before creating the order.
+        await assertRegistrationOpen();
         order = await razorpay.createOrder({
           amount: claim.amount,
           currency: CURRENCY,
@@ -222,7 +245,10 @@ export function createCheckoutService({
       }
       assertOrder(order, expected);
     } catch (error) {
-      if (error instanceof AppError && error.code === 'PAYMENT_ORDER_IN_PROGRESS') throw error;
+      if (
+        error instanceof AppError
+        && (error.code === 'PAYMENT_ORDER_IN_PROGRESS' || error.code === 'REGISTRATION_CLOSED')
+      ) throw error;
       try {
         order = await razorpay.findOrderByReceipt(claim.receipt);
         if (order) assertOrder(order, expected);
@@ -245,6 +271,8 @@ export function createCheckoutService({
         throw new AppError('PAYMENT_ORDER_FAILED', 'The payment order could not be created. Your seat remains reserved until the displayed expiry time.', 502);
       }
     }
+    // Do not associate or expose an order if registration closed while Razorpay was responding.
+    await assertRegistrationOpen();
     const associated = await associateOrder(ref, expected, order);
     if (
       associated.registrationStatus !== REGISTRATION_STATUS.paymentPending
@@ -258,10 +286,62 @@ export function createCheckoutService({
   }
 
   async function start(input, recoveryTokenHash) {
-    const created = await createRegistration(input, { recoveryTokenHash });
+    const resumable = typeof createRegistration.findResumable === 'function'
+      ? await createRegistration.findResumable(input)
+      : null;
+    let recovered = resumable && paymentService?.findCapturedForRegistrationRef
+      ? await paymentService.findCapturedForRegistrationRef(resumable.ref)
+      : null;
+    let created;
+    try {
+      created = await createRegistration(input, { recoveryTokenHash });
+    } catch (error) {
+      if (
+        recovered?.outcome === 'CAPTURED'
+        && CAPACITY_ERRORS.has(error.code)
+        && paymentService?.confirmFetchedPayment
+      ) {
+        await paymentService.confirmFetchedPayment(resumable.ref, recovered.payment, recovered.order, {
+          source: 'RETRY_RECOVERY',
+          registrationId: resumable.data.registrationId,
+        });
+        throw new AppError(
+          'PAYMENT_REQUIRES_RECONCILIATION',
+          'Payment was captured, but capacity is no longer available. Please contact the organizers.',
+          409,
+        );
+      }
+      throw error;
+    }
     const ref = db.collection('registrations').doc(created.registrationDocId);
     if (await expireIfDue(ref, { ...created, capacityReleased: false })) {
       throw new AppError('RESERVATION_EXPIRED', 'The seat reservation has expired.', 409);
+    }
+    if (resumable && paymentService?.findCapturedForRegistrationRef) {
+      if (recovered?.outcome !== 'CAPTURED') {
+        recovered = await paymentService.findCapturedForRegistrationRef(ref);
+      }
+      if (recovered.outcome === 'CAPTURED') {
+        const confirmed = await paymentService.confirmFetchedPayment(
+          ref,
+          recovered.payment,
+          recovered.order,
+          { source: 'RETRY_RECOVERY', registrationId: created.registrationId },
+        );
+        if (confirmed.outcome !== 'CONFIRMED') {
+          throw new AppError(
+            'PAYMENT_REQUIRES_RECONCILIATION',
+            'The previous payment requires organizer reconciliation.',
+            409,
+          );
+        }
+        const refreshed = await ref.get();
+        return participantResponse(refreshed.data(), razorpay.getPublicKeyId());
+      }
+      const refreshed = await ref.get();
+      if (refreshed.data().paymentStatus === 'PAID') {
+        throw new AppError('PAYMENT_REQUIRES_RECONCILIATION', 'The previous payment requires organizer reconciliation.', 409);
+      }
     }
     const registration = await ensureOrder(ref, recoveryTokenHash);
     return participantResponse(registration, razorpay.getPublicKeyId());
@@ -284,6 +364,7 @@ export function createCheckoutService({
       const refreshed = await result.ref.get();
       result.data = refreshed.data();
     }
+    await assertRegistrationOpen();
     const { data } = result;
     return participantResponse(data, razorpay.getPublicKeyId());
   }

@@ -14,5 +14,6 @@ export function createRazorpayGateway({ getKeyId, getKeySecret }) {
     },
     fetchPayment: (paymentId) => client().payments.fetch(paymentId),
     fetchOrder: (orderId) => client().orders.fetch(orderId),
+    fetchPaymentsForOrder: (orderId) => client().orders.fetchPayments(orderId),
   };
 }

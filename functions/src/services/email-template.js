@@ -9,6 +9,7 @@ const HOSTELS = Object.freeze({
   SANTHOME: 'Santhome',
   HOLY_CROSS: 'Holy Cross',
   ALPHONSA: 'Alphonsa',
+  PG_HOUSE_NEAR_COLLEGE: 'PG/House Near College',
 });
 
 export function escapeHtml(value) {

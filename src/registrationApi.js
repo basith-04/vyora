@@ -51,4 +51,5 @@ export const registrationApi = {
   retry: (registrationId, token) => apiRequest('/api/registrations/retry', { registrationId }, token),
   status: (registrationId, token) => apiRequest('/api/registrations/status', { registrationId }, token),
   verify: (payment, token) => apiRequest('/api/payments/verify', payment, token),
+  ticket: (registrationId, token) => apiRequest('/api/registrations/ticket', { registrationId }, token),
 };

@@ -17,6 +17,7 @@ import {
   phaseForApiError,
 } from './registrationFlow.js';
 import './registration.css';
+import ParticipantTicket from './ParticipantTicket.jsx';
 
 const steps = [
   { number: '01', label: 'DETAILS' },
@@ -113,10 +114,10 @@ function formatCountdown(seconds) {
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
 }
 
-function PaymentState({ phase, reservation, remainingSeconds, message, onRetry, onFresh }) {
+function PaymentState({ phase, reservation, remainingSeconds, message, onRetry, onFresh, ticket, ticketLoading, ticketError, onTicketRetry }) {
   const [title, copy] = stateCopy[phase] ?? ['REGISTRATION ERROR', message || 'The request could not be completed.'];
   const confirmed = phase === FLOW_PHASE.confirmed;
-  return <div className={`registration-terminal registration-success registration-payment-state state-${phase}`} role="status" aria-live="polite"><span>// PAYMENT.EXE</span>{confirmed && <div className="registration-success-mark" aria-hidden="true">✓</div>}<h1>{title}</h1><p>{message || copy}</p>{reservation && <div className="registration-success-grid"><div><span>REGISTRATION</span><strong>{reservation.registrationId}</strong></div><div><span>SERVER STATUS</span><strong>{reservation.registrationStatus}</strong></div><div><span>AUTHORITATIVE TOTAL</span><strong>{formatFee(reservation.pricing?.totalFee)}</strong></div><div><span>RESERVATION TIMER</span><strong className="registration-pending">{formatCountdown(remainingSeconds)}</strong></div></div>}{canRetryPayment(phase, remainingSeconds) && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>OPEN CHECKOUT AGAIN <span aria-hidden="true">→</span></button>}{phase === FLOW_PHASE.paymentFailed && !reservation && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>TRY AGAIN <span aria-hidden="true">→</span></button>}{[FLOW_PHASE.expired, FLOW_PHASE.paymentFailed, FLOW_PHASE.networkError].includes(phase) && <button className="registration-secondary-action" type="button" onClick={onFresh}>START A FRESH ATTEMPT</button>}<div className="registration-success-actions"><a href="/">BACK TO HOME →</a></div></div>;
+  return <div className={`registration-terminal registration-success registration-payment-state state-${phase}`} role="status" aria-live="polite"><span>// PAYMENT.EXE</span>{confirmed && <div className="registration-success-mark" aria-hidden="true">✓</div>}<h1>{title}</h1><p>{message || copy}</p>{reservation && <div className="registration-success-grid"><div><span>REGISTRATION</span><strong>{reservation.registrationId}</strong></div><div><span>SERVER STATUS</span><strong>{reservation.registrationStatus}</strong></div><div><span>AUTHORITATIVE TOTAL</span><strong>{formatFee(reservation.pricing?.totalFee)}</strong></div><div><span>{confirmed ? 'PAYMENT' : 'RESERVATION TIMER'}</span><strong className={confirmed ? '' : 'registration-pending'}>{confirmed ? 'PAID' : formatCountdown(remainingSeconds)}</strong></div></div>}{confirmed && <ParticipantTicket ticket={ticket} loading={ticketLoading} error={ticketError} onRetry={onTicketRetry} />}{canRetryPayment(phase, remainingSeconds) && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>OPEN CHECKOUT AGAIN <span aria-hidden="true">→</span></button>}{phase === FLOW_PHASE.paymentFailed && !reservation && <button className="registration-submit registration-retry" type="button" onClick={onRetry}>TRY AGAIN <span aria-hidden="true">→</span></button>}{[FLOW_PHASE.expired, FLOW_PHASE.paymentFailed, FLOW_PHASE.networkError].includes(phase) && <button className="registration-secondary-action" type="button" onClick={onFresh}>START A FRESH ATTEMPT</button>}<div className="registration-success-actions"><a href="/">BACK TO HOME →</a></div></div>;
 }
 
 const SESSION_KEY = 'vyora26.registration.recovery';
@@ -129,6 +130,9 @@ export default function RegistrationPage() {
   const [reservation, setReservation] = useState(null);
   const [flowMessage, setFlowMessage] = useState('');
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [ticket, setTicket] = useState(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [ticketError, setTicketError] = useState('');
   const recoveryToken = useRef(null);
   const submissionInFlight = useRef(false);
   const refs = {
@@ -164,6 +168,17 @@ export default function RegistrationPage() {
     saveRecovery(data.registrationId, token);
     setRemainingSeconds(Math.max(0, Math.ceil((Date.parse(data.seatReservationExpiresAt) - Date.now()) / 1000)));
   };
+  const loadTicket = async (registrationId, token) => {
+    setTicketLoading(true);
+    setTicketError('');
+    try {
+      setTicket(await registrationApi.ticket(registrationId, token));
+    } catch (error) {
+      setTicketError(error.message || 'The ticket could not be loaded.');
+    } finally {
+      setTicketLoading(false);
+    }
+  };
   const runCheckout = async (data, token) => {
     if (!data.checkout || Date.parse(data.seatReservationExpiresAt) <= Date.now()) {
       setPhase(FLOW_PHASE.expired);
@@ -198,9 +213,9 @@ export default function RegistrationPage() {
         razorpaySignature: checkoutResult.response.razorpay_signature,
       }, token);
       setReservation((previous) => ({ ...previous, ...verified }));
-      sessionStorage.removeItem(SESSION_KEY);
       setPhase(FLOW_PHASE.confirmed);
       setFlowMessage('');
+      await loadTicket(data.registrationId, token);
     } catch (error) {
       setFlowMessage(error.message);
       setPhase(phaseForApiError(error));
@@ -246,8 +261,8 @@ export default function RegistrationPage() {
     registrationApi.status(saved.registrationId, saved.token).then((data) => {
       applyReservation(data, saved.token);
       if (data.registrationStatus === 'CONFIRMED') {
-        sessionStorage.removeItem(SESSION_KEY);
         setPhase(FLOW_PHASE.confirmed);
+        loadTicket(data.registrationId, saved.token);
       } else if (data.registrationStatus === 'EXPIRED') {
         setPhase(FLOW_PHASE.expired);
       } else {
@@ -298,10 +313,12 @@ export default function RegistrationPage() {
     sessionStorage.removeItem(SESSION_KEY);
     recoveryToken.current = null;
     setReservation(null);
+    setTicket(null);
+    setTicketError('');
     setFlowMessage('');
     setPhase(FLOW_PHASE.form);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  return <main className="registration-page" id="main-content"><div className="registration-container">{phase !== FLOW_PHASE.form ? <PaymentState phase={phase} reservation={reservation} remainingSeconds={remainingSeconds} message={flowMessage} onRetry={retry} onFresh={freshAttempt} /> : <><RegistrationHero /><Progress current={current} complete={complete} /><div className="registration-layout"><form className="registration-form" noValidate onSubmit={onSubmit}><ParticipantSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><IeeeSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} fee={fees.baseFee} /><WorkshopSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><FeesSection form={form} fees={fees} /><ReviewSection form={form} fees={fees} workshop={workshop} year={year} onEdit={onEdit} loading={isBusyPhase(phase)} /></form><RegistrationStatus fees={fees} workshop={workshop} completion={completion} /></div></>}</div></main>;
+  return <main className="registration-page" id="main-content"><div className="registration-container">{phase !== FLOW_PHASE.form ? <PaymentState phase={phase} reservation={reservation} remainingSeconds={remainingSeconds} message={flowMessage} onRetry={retry} onFresh={freshAttempt} ticket={ticket} ticketLoading={ticketLoading} ticketError={ticketError} onTicketRetry={() => loadTicket(reservation.registrationId, recoveryToken.current)} /> : <><RegistrationHero /><Progress current={current} complete={complete} /><div className="registration-layout"><form className="registration-form" noValidate onSubmit={onSubmit}><ParticipantSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><IeeeSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} fee={fees.baseFee} /><WorkshopSection form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /><FeesSection form={form} fees={fees} /><ReviewSection form={form} fees={fees} workshop={workshop} year={year} onEdit={onEdit} loading={isBusyPhase(phase)} /></form><RegistrationStatus fees={fees} workshop={workshop} completion={completion} /></div></>}</div></main>;
 }

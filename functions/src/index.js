@@ -13,10 +13,13 @@ import { createWebhookService } from './services/webhook.js';
 import { createAdminAuthorization } from './middleware/admin-auth.js';
 import { createAdminReportingService } from './services/admin-reporting.js';
 import { createAdminRouter } from './routes/admin.js';
+import { createTicketService } from './services/ticket.js';
+import { createCheckinService } from './services/checkin.js';
 
 const razorpayKeyId = defineSecret('RAZORPAY_KEY_ID');
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
 const razorpayWebhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
+const ticketSigningSecret = defineSecret('TICKET_SIGNING_SECRET');
 
 const createRegistration = createRegistrationService({ db });
 const expirationService = createExpirationService({ db });
@@ -27,8 +30,12 @@ const razorpay = createRazorpayGateway({
 const checkoutService = createCheckoutService({
   db, createRegistration, expirationService, razorpay, logger,
 });
+const ticketService = createTicketService({
+  db,
+  getSigningSecret: () => ticketSigningSecret.value(),
+});
 const paymentService = createPaymentService({
-  db, razorpay, getKeySecret: () => razorpayKeySecret.value(), logger,
+  db, razorpay, getKeySecret: () => razorpayKeySecret.value(), ticketService, logger,
 });
 const webhookService = createWebhookService({
   paymentService,
@@ -38,6 +45,7 @@ const webhookService = createWebhookService({
 const adminRouter = createAdminRouter({
   authorizeAdmin: createAdminAuthorization({ auth, db }),
   reportingService: createAdminReportingService({ db }),
+  checkinService: createCheckinService({ db, ticketService }),
 });
 
 export const api = onRequest(
@@ -45,9 +53,9 @@ export const api = onRequest(
     region: 'asia-south1',
     timeoutSeconds: 30,
     memory: '256MiB',
-    secrets: [razorpayKeyId, razorpayKeySecret, razorpayWebhookSecret],
+    secrets: [razorpayKeyId, razorpayKeySecret, razorpayWebhookSecret, ticketSigningSecret],
   },
-  createApp({ checkoutService, paymentService, webhookService, adminRouter, logger }),
+  createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger }),
 );
 
 export const expireReservations = onSchedule(

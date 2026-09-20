@@ -13,7 +13,7 @@ function registrationIdFromBody(body) {
   return body.registrationId;
 }
 
-export function createApp({ checkoutService, paymentService, webhookService, adminRouter, logger = console }) {
+export function createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger = console }) {
   const app = express();
   app.disable('x-powered-by');
   app.use((request, response, next) => {
@@ -82,6 +82,16 @@ export function createApp({ checkoutService, paymentService, webhookService, adm
         request.body,
         registrationTokenHash(request),
       );
+      response.status(200).json({ data });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/registrations/ticket', async (request, response, next) => {
+    try {
+      const registrationId = registrationIdFromBody(request.body);
+      const data = await ticketService.participantTicket(registrationId, registrationTokenHash(request));
       response.status(200).json({ data });
     } catch (error) {
       next(error);

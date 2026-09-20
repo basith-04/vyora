@@ -5,6 +5,8 @@ export const COLLECTIONS = Object.freeze({
   registrationLocks: 'registrationLocks',
   payments: 'payments',
   admins: 'admins',
+  tickets: 'tickets',
+  checkins: 'checkins',
 });
 
 export const SYSTEM_DOCUMENTS = Object.freeze({
@@ -43,6 +45,11 @@ export const ORDER_CREATION_STATUS = Object.freeze({
   creating: 'CREATING',
   ready: 'READY',
   failed: 'FAILED',
+});
+
+export const CHECKIN_TYPE = Object.freeze({
+  event: 'EVENT',
+  workshop: 'WORKSHOP',
 });
 
 export const DEFAULT_CONFIGURATION = Object.freeze({

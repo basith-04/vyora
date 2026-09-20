@@ -67,6 +67,7 @@ export function createPaymentService({
   razorpay,
   getKeySecret,
   ticketService = null,
+  confirmationEmailService = null,
   clock = () => Date.now(),
   logger = console,
 }) {
@@ -195,8 +196,9 @@ export function createPaymentService({
       return { outcome: 'CONFIRMED', registrationStatus: REGISTRATION_STATUS.confirmed, idempotent: false };
     });
     if (result.outcome === 'CONFIRMED' && ticketService) {
+      let issued;
       try {
-        const issued = await ticketService.issueForRegistrationRef(ref);
+        issued = await ticketService.issueForRegistrationRef(ref);
         result.ticketIssued = Boolean(issued.ticket);
       } catch (error) {
         // Payment truth is already committed. Ticket issuance is independently retryable.
@@ -207,6 +209,21 @@ export function createPaymentService({
           code: error?.code || 'INTERNAL_ERROR',
         });
         result.ticketIssued = false;
+      }
+      if (issued?.ticket && confirmationEmailService) {
+        try {
+          const email = await confirmationEmailService.sendForRegistrationRef(ref, issued);
+          result.confirmationEmailStatus = email.outcome;
+        } catch (error) {
+          // Email is secondary and cannot change payment or ticket truth.
+          logger.error('Confirmation email orchestration failed.', {
+            registrationId: registration.registrationId,
+            operation: 'send_confirmation_email',
+            result: 'failed',
+            code: error?.code || 'INTERNAL_ERROR',
+          });
+          result.confirmationEmailStatus = 'FAILED';
+        }
       }
     }
     return result;
@@ -262,6 +279,7 @@ export function createPaymentService({
       paymentStatus: PAYMENT_STATUS.paid,
       idempotent: result.idempotent,
       ticketIssued: result.ticketIssued === true,
+      confirmationEmailStatus: result.confirmationEmailStatus || null,
     };
   }
 

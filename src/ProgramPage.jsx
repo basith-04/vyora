@@ -26,13 +26,15 @@ const days = [
     entries: [
       { start: '8:30 AM', end: '9:30 AM', title: 'BREAKFAST', compact: true },
       {
-        start: '9:30 AM', end: '12:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
+        start: '9:30 AM', end: '10:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
         tracks: [
-          { number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', people: 'Sreeram M R · Entri App', tone: 'orange' },
-          { number: '02', title: 'AI / ML / DATA SCIENCE', people: 'Abhinav I · Usmanul Faris K S · Abhiram M S · S7 ADS A', tone: 'blue' },
-          { number: '03', title: 'GITHUB × AI', people: 'Josin Joseph · Samanway T K · S7 ADS A', tone: 'green' },
+          { number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', people: 'Sreeram M R', tone: 'orange' },
+          { number: '02', title: 'AI / ML / DATA SCIENCE', people: 'Abhinav I · Usmanul Faris K S · Abhiram M S ', tone: 'blue' },
+          { number: '03', title: 'GITHUB × AI', people: 'Josin Joseph · Samanway T K ', tone: 'green' },
         ],
       },
+      { start: '10:30 PM', end: '12:30 PM', title: 'treasure hunt', compact: true },
+
       { start: '12:30 PM', end: '1:30 PM', title: 'LUNCH BREAK', compact: true },
       { start: '1:30 PM', end: '2:30 PM', title: 'TECHNICAL TALK 01', detail: 'Dr. P. Santhi Thilagam', notes: ['Professor, NITK Surathkal'] },
       { start: '2:30 PM', end: '3:30 PM', title: 'TECHNICAL TALK 02', detail: 'Ms. Aleena K Shibu', notes: ['Izado Solutions · BMS Application Engineer'] },

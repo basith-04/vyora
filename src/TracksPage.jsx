@@ -12,7 +12,7 @@ const tracks = [
     descriptor: 'DATA / ANALYSIS / VISUALISATION',
     speakerLabel: 'SPEAKER',
     speakers: ['Sreeram M R'],
-    affiliation: 'Entri App',
+    affiliation: '',
     action: 'INSPECT TRACK',
   },
   {
@@ -23,7 +23,7 @@ const tracks = [
     descriptor: 'MODELS / DATA / INTELLIGENCE',
     speakerLabel: 'SPEAKERS',
     speakers: ['Abhinav I', 'Usmanul Faris K S', 'Abhiram M S'],
-    affiliation: 'S7 ADS A',
+    affiliation: '',
     action: 'INSPECT TRACK',
   },
   {
@@ -34,7 +34,7 @@ const tracks = [
     descriptor: 'CODE / COLLABORATION / AI',
     speakerLabel: 'SPEAKERS',
     speakers: ['Josin Joseph', 'Samanway T K'],
-    affiliation: 'S7 ADS A',
+    affiliation: '',
     action: 'LOAD MODULE',
   },
 ];
@@ -105,7 +105,7 @@ function TrackWindow({ track, selected, onSelect }) {
         </div>
         <div className="track-window-visual">{track.number === '01' ? <DataDiagram /> : track.number === '02' ? <ModelDiagram /> : <GitDiagram />}</div>
         <div className="track-window-speakers"><span>{track.speakerLabel}</span>{track.speakers.map((speaker)=><strong key={speaker}>{speaker}</strong>)}<small>{track.affiliation}</small></div>
-        <button className="track-window-action" type="button" aria-pressed={selected} onClick={onSelect}>{track.action} <span aria-hidden="true">→</span></button>
+        {/* <button className="track-window-action" type="button" aria-pressed={selected} onClick={onSelect}>{track.action} <span aria-hidden="true">→</span></button> */}
       </div>
     </article>
   );

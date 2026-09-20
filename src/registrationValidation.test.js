@@ -16,6 +16,8 @@ const valid = {
   email: 'test@example.com',
   phone: '9876543210',
   year: 3,
+  department: 'CSE',
+  class: 'CSE B',
   ieeeMember: false,
   ieeeMembershipId: null,
   isHosteller: false,
@@ -41,8 +43,23 @@ test('reports missing participant and workshop fields', () => {
   assert.equal(errors.email, 'ENTER A VALID EMAIL ADDRESS.');
   assert.equal(errors.phone, 'ENTER A 10-DIGIT MOBILE NUMBER.');
   assert.equal(errors.year, 'SELECT YOUR YEAR OF STUDY.');
+  assert.equal(errors.department, 'SELECT YOUR DEPARTMENT.');
+  assert.equal(errors.class, 'SELECT A VALID CLASS.');
   assert.equal(errors.isHosteller, 'SELECT YOUR HOSTELLER STATUS.');
   assert.equal(errors.workshopId, 'SELECT ONE AIDEX WORKSHOP.');
+});
+
+test('department changes reset class to a valid canonical value', () => {
+  const ads = updateRegistrationField(valid, 'department', 'ADS');
+  assert.equal(ads.class, '');
+  assert.deepEqual(validateRegistration({ ...ads, class: 'ADS A' }), {});
+  assert.deepEqual(validateRegistration({ ...ads, class: 'ADS B' }), {});
+  assert.equal(validateRegistration({ ...ads, class: 'CSE A' }).class, 'SELECT A VALID CLASS.');
+
+  const ece = updateRegistrationField(valid, 'department', 'ECE');
+  assert.equal(ece.class, 'ECE');
+  assert.deepEqual(validateRegistration(ece), {});
+  assert.equal(validateRegistration({ ...ece, class: 'CSE A' }).class, 'SELECT A VALID CLASS.');
 });
 
 test('calculates every IEEE and accommodation combination', () => {

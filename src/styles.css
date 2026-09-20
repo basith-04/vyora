@@ -97,6 +97,7 @@ a { color: inherit; }
 
 .event-metadata { position: absolute; z-index: var(--layer-content); top: 10.1%; left: 13%; display: flex; gap: clamp(40px, 6.5vw, 108px); width: 55%; color: #f5eee7; font-size: clamp(11px, 1.08vw, 18px); line-height: 1.38; letter-spacing: .015em; white-space: nowrap; text-shadow: 1px 1px 0 #0a2634; }
 .event-host, .event-brief { display: flex; flex-direction: column; }
+.event-host > span:first-child { font-size: 1.08em; font-weight: 700; }
 .hero-title { position: absolute; z-index: var(--layer-content); left: 3.8%; top: 20.9%; margin: 0; display: flex; flex-direction: column; align-items: flex-start; color: var(--vyora-cream); font: 700 clamp(122px, 12.7vw, 215px)/.78 var(--font-hero); letter-spacing: -.052em; white-space: nowrap; text-shadow: 2px 2px 0 rgba(3,22,31,.2); }
 .hero-title > span:first-child { transform: translateX(-.8vw) scaleX(1.05); transform-origin: left center; }
 .hero-title .year { color: var(--vyora-orange); line-height: .78; transform: translateY(-1.25vw); }
@@ -195,7 +196,7 @@ a { color: inherit; }
 @media (max-width: 450px) {
   .hero-title { top: 4.1%; }
   .event-metadata { top: calc(var(--scene-height) * .27); }
-  .event-host > span:first-child { font-size: clamp(11px, 2.8vw, 12px); font-weight: 700; }
+  .event-host > span:first-child { font-size: clamp(12px, 3vw, 13px); }
   .hero-tagline { top: calc(var(--scene-height) * .41); }
   .handwritten-note { bottom: 35px; font-size: clamp(27px, 7.2vw, 34px); }
   .location-plaque { bottom: 34px; width: 112px; font-size: 11px; }

@@ -22,3 +22,15 @@ export const years = [
   { id: 3, number: '03', label: 'THIRD YEAR' },
   { id: 4, number: '04', label: 'FOURTH YEAR' },
 ];
+
+export const departmentClasses = Object.freeze({
+  ADS: Object.freeze(['ADS A', 'ADS B']),
+  CSE: Object.freeze(['CSE A', 'CSE B', 'CSE C', 'CSE D']),
+  CSD: Object.freeze(['CSD']),
+  CSBS: Object.freeze(['CSBS']),
+  'CS & CY': Object.freeze(['CS & CY']),
+  ECE: Object.freeze(['ECE']),
+  'ME/CE': Object.freeze(['ME/CE']),
+  EEE: Object.freeze(['EEE']),
+  AEI: Object.freeze(['AEI']),
+});

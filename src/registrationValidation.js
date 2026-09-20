@@ -1,7 +1,7 @@
-import { hostels, registrationOptions, workshops, years } from './registrationOptions.js';
+import { departmentClasses, hostels, registrationOptions, workshops, years } from './registrationOptions.js';
 
 export const initialRegistration = {
-  fullName: '', email: '', phone: '', year: '', ieeeMember: null,
+  fullName: '', email: '', phone: '', year: '', department: '', class: '', ieeeMember: null,
   ieeeMembershipId: '', isHosteller: null, hostel: null, needsStay: null,
   stayType: null, workshopId: '',
 };
@@ -10,6 +10,9 @@ export function updateRegistrationField(form, field, value) {
   return {
     ...form,
     [field]: value,
+    ...(field === 'department' ? {
+      class: departmentClasses[value]?.length === 1 ? departmentClasses[value][0] : '',
+    } : {}),
     ...(field === 'ieeeMember' && value === false ? { ieeeMembershipId: null } : {}),
     ...(field === 'ieeeMember' && value === true ? { ieeeMembershipId: '' } : {}),
     ...(field === 'isHosteller' && value === true ? { hostel: null, needsStay: false, stayType: null } : {}),
@@ -59,6 +62,8 @@ export function validateRegistration(form) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = 'ENTER A VALID EMAIL ADDRESS.';
   if (!/^\d{10}$/.test(normalizePhone(form.phone))) errors.phone = 'ENTER A 10-DIGIT MOBILE NUMBER.';
   if (!years.some((year) => year.id === form.year)) errors.year = 'SELECT YOUR YEAR OF STUDY.';
+  if (!Object.hasOwn(departmentClasses, form.department)) errors.department = 'SELECT YOUR DEPARTMENT.';
+  if (!departmentClasses[form.department]?.includes(form.class)) errors.class = 'SELECT A VALID CLASS.';
   if (form.isHosteller === null) errors.isHosteller = 'SELECT YOUR HOSTELLER STATUS.';
   if (form.isHosteller === true && !hostels.some((hostel) => hostel.id === form.hostel)) errors.hostel = 'SELECT YOUR HOSTEL.';
   if (form.isHosteller === false && form.needsStay === null) errors.needsStay = 'SELECT IF YOU NEED STAY.';

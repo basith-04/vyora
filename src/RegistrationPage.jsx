@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { hostels, workshops, years } from './registrationOptions.js';
+import { departmentClasses, hostels, workshops, years } from './registrationOptions.js';
 import {
   buildRegistrationSubmission,
   calculateFees,
@@ -68,7 +68,8 @@ function AccommodationFields({ form, update, blur, errorFor, refs }) {
 }
 
 function ParticipantSection({ form, update, blur, errorFor, refs }) {
-  return <section className="registration-section" id="registration-details" aria-labelledby="details-heading"><SectionHeading number="01" title="PARTICIPANT DETAILS" copy="TELL US ABOUT YOURSELF." /><div className="registration-fields"><TextField field="fullName" label="FULL NAME" placeholder="Enter your full name" value={form.fullName} onChange={(event) => update('fullName', event.target.value)} onBlur={() => blur('fullName')} error={errorFor('fullName')} inputRef={refs.fullName} autoComplete="name" /><TextField field="email" label="EMAIL ADDRESS" placeholder="you@example.com" type="email" value={form.email} onChange={(event) => update('email', event.target.value)} onBlur={() => blur('email')} error={errorFor('email')} inputRef={refs.email} autoComplete="email" /><TextField field="phone" label="PHONE NUMBER" placeholder="10-digit mobile number" type="tel" value={form.phone} onChange={(event) => update('phone', normalizePhone(event.target.value))} onBlur={() => blur('phone')} error={errorFor('phone')} inputRef={refs.phone} autoComplete="tel" inputMode="numeric" prefix="+91" /></div><fieldset className="registration-choice-fieldset"><legend>YEAR OF STUDY <span aria-hidden="true">*</span></legend><div className="registration-year-grid">{years.map((year, index) => <label className={`registration-year-option${form.year === year.id ? ' is-selected' : ''}`} key={year.id}><input ref={index === 0 ? refs.year : undefined} type="radio" name="year" required value={year.id} checked={form.year === year.id} onChange={() => update('year', year.id)} onBlur={() => blur('year')} aria-describedby={errorFor('year') ? 'year-error' : undefined} /><span className="registration-radio-mark" aria-hidden="true" /><span className="registration-choice-number">{year.number}</span><span>{year.label}</span></label>)}</div><FieldError id="year-error" error={errorFor('year')} /></fieldset><AccommodationFields form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /></section>;
+  const classes = departmentClasses[form.department] || [];
+  return <section className="registration-section" id="registration-details" aria-labelledby="details-heading"><SectionHeading number="01" title="PARTICIPANT DETAILS" copy="TELL US ABOUT YOURSELF." /><div className="registration-fields"><TextField field="fullName" label="FULL NAME" placeholder="Enter your full name" value={form.fullName} onChange={(event) => update('fullName', event.target.value)} onBlur={() => blur('fullName')} error={errorFor('fullName')} inputRef={refs.fullName} autoComplete="name" /><TextField field="email" label="EMAIL ADDRESS" placeholder="you@example.com" type="email" value={form.email} onChange={(event) => update('email', event.target.value)} onBlur={() => blur('email')} error={errorFor('email')} inputRef={refs.email} autoComplete="email" /><TextField field="phone" label="PHONE NUMBER" placeholder="10-digit mobile number" type="tel" value={form.phone} onChange={(event) => update('phone', normalizePhone(event.target.value))} onBlur={() => blur('phone')} error={errorFor('phone')} inputRef={refs.phone} autoComplete="tel" inputMode="numeric" prefix="+91" /><div className="registration-field"><label htmlFor="department">DEPARTMENT <span aria-hidden="true">*</span></label><div className="registration-input-wrap registration-select-wrap"><select ref={refs.department} id="department" name="department" required value={form.department} onChange={(event) => update('department', event.target.value)} onBlur={() => blur('department')} aria-invalid={!!errorFor('department')} aria-describedby={errorFor('department') ? 'department-error' : undefined}><option value="">Select department</option>{Object.keys(departmentClasses).map((department) => <option key={department} value={department}>{department}</option>)}</select></div><FieldError id="department-error" error={errorFor('department')} /></div><div className="registration-field"><label htmlFor="class">CLASS <span aria-hidden="true">*</span></label><div className="registration-input-wrap registration-select-wrap"><select ref={refs.class} id="class" name="class" required disabled={!form.department} value={form.class} onChange={(event) => update('class', event.target.value)} onBlur={() => blur('class')} aria-invalid={!!errorFor('class')} aria-describedby={errorFor('class') ? 'class-error' : undefined}><option value="">Select class</option>{classes.map((className) => <option key={className} value={className}>{className}</option>)}</select></div><FieldError id="class-error" error={errorFor('class')} /></div></div><fieldset className="registration-choice-fieldset"><legend>YEAR OF STUDY <span aria-hidden="true">*</span></legend><div className="registration-year-grid">{years.map((year, index) => <label className={`registration-year-option${form.year === year.id ? ' is-selected' : ''}`} key={year.id}><input ref={index === 0 ? refs.year : undefined} type="radio" name="year" required value={year.id} checked={form.year === year.id} onChange={() => update('year', year.id)} onBlur={() => blur('year')} aria-describedby={errorFor('year') ? 'year-error' : undefined} /><span className="registration-radio-mark" aria-hidden="true" /><span className="registration-choice-number">{year.number}</span><span>{year.label}</span></label>)}</div><FieldError id="year-error" error={errorFor('year')} /></fieldset><AccommodationFields form={form} update={update} blur={blur} errorFor={errorFor} refs={refs} /></section>;
 }
 
 function IeeeSection({ form, update, blur, errorFor, refs, fee }) {
@@ -137,6 +138,7 @@ export default function RegistrationPage() {
   const submissionInFlight = useRef(false);
   const refs = {
     fullName: useRef(null), email: useRef(null), phone: useRef(null), year: useRef(null),
+    department: useRef(null), class: useRef(null),
     isHosteller: useRef(null), hostel: useRef(null), needsStay: useRef(null), stayType: useRef(null),
     ieeeMember: useRef(null), ieeeMembershipId: useRef(null), workshopId: useRef(null),
   };
@@ -145,7 +147,7 @@ export default function RegistrationPage() {
   const workshop = workshops.find((item) => item.id === form.workshopId);
   const year = years.find((item) => item.id === form.year);
   const complete = [
-    !errors.fullName && !errors.email && !errors.phone && !errors.year && !errors.isHosteller && !errors.hostel && !errors.needsStay && !errors.stayType,
+    !errors.fullName && !errors.email && !errors.phone && !errors.year && !errors.department && !errors.class && !errors.isHosteller && !errors.hostel && !errors.needsStay && !errors.stayType,
     !errors.ieeeMember && !errors.ieeeMembershipId,
     !errors.workshopId,
     fees.totalFee !== null,
@@ -154,6 +156,7 @@ export default function RegistrationPage() {
   const completion = complete.filter(Boolean).length;
   const update = (field, value) => {
     setForm((previous) => updateRegistrationField(previous, field, value));
+    if (field === 'department') setTouched((previous) => ({ ...previous, class: false }));
     if (field === 'isHosteller') setTouched((previous) => ({ ...previous, hostel: false, needsStay: false, stayType: false }));
     if (field === 'needsStay') setTouched((previous) => ({ ...previous, stayType: false }));
   };

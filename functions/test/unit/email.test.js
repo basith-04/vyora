@@ -33,6 +33,21 @@ test('confirmation email refuses non-HTTPS production links', () => {
   );
 });
 
+test('confirmation email displays the PG/House Near College label', () => {
+  const result = confirmationEmailContent({
+    registration: {
+      ...registration,
+      isHosteller: true,
+      hostel: 'PG_HOUSE_NEAR_COLLEGE',
+      needsStay: false,
+      stayType: null,
+    },
+    ticketViewToken: `vyora26:v:${'A'.repeat(43)}`,
+    baseUrl: 'https://vyora.example/',
+  });
+  assert.match(result.text, /Existing hosteller — PG\/House Near College/);
+});
+
 test('Resend provider sends a fixed payload with a provider idempotency key', async () => {
   let request;
   const provider = createResendEmailProvider({

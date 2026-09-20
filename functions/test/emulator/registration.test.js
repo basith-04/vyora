@@ -82,11 +82,28 @@ beforeEach(async () => {
 
 test('valid registration persists department and class without changing pricing', async () => {
   await seed();
-  const create = createRegistrationService({ db });
+  const creationTime = 1_800_000_000_000;
+  const create = createRegistrationService({ db, clock: () => creationTime });
   const result = await register(create, valid);
   const stored = (await db.doc(`registrations/${result.registrationDocId}`).get()).data();
   assert.equal(stored.department, 'CSE');
   assert.equal(stored.class, 'CSE B');
+  assert.deepEqual(result.pricing, { baseFee: 799, stayFee: 0, totalFee: 799 });
+  assert.equal(result.seatReservationExpiresAt.toMillis(), creationTime + 900_000);
+});
+
+test('stores PG/House Near College with the existing hosteller exemption', async () => {
+  await seed();
+  const create = createRegistrationService({ db });
+  const result = await register(create, {
+    ...valid,
+    isHosteller: true,
+    hostel: 'PG_HOUSE_NEAR_COLLEGE',
+    needsStay: false,
+    stayType: null,
+  });
+  const stored = (await db.doc(`registrations/${result.registrationDocId}`).get()).data();
+  assert.equal(stored.hostel, 'PG_HOUSE_NEAR_COLLEGE');
   assert.deepEqual(result.pricing, { baseFee: 799, stayFee: 0, totalFee: 799 });
 });
 
@@ -146,15 +163,15 @@ test('two concurrent first-year requests cannot take one remaining first-year se
   assert.equal((await db.doc('system/capacity').get()).data().firstYearOccupied, 55);
 });
 
-test('simultaneous duplicate attempts create only one active reservation', async () => {
+test('simultaneous matching attempts resume one active reservation without double-counting', async () => {
   await seed();
   const create = createRegistrationService({ db });
   const results = await Promise.allSettled([
     register(create, valid, tokenA),
     register(create, valid, tokenB),
   ]);
-  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
-  assert.equal(results.filter((result) => result.status === 'rejected' && result.reason.code === 'DUPLICATE_REGISTRATION').length, 1);
+  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 2);
+  assert.equal(new Set(results.map((result) => result.value.registrationId)).size, 1);
   assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 1);
   assert.equal((await db.collection('registrations').get()).size, 1);
   assert.equal((await db.collection('registrationLocks').get()).size, 2);
@@ -165,7 +182,7 @@ test('expiration releases capacity once and permits a new attempt', async () => 
   const creationTime = 1_800_000_000_000;
   const createExpired = createRegistrationService({ db, clock: () => creationTime });
   const first = await register(createExpired, { ...valid, year: 1 });
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
 
   assert.deepEqual(await expiration.expireRegistration(first.registrationDocId), { outcome: 'EXPIRED' });
   assert.deepEqual(await expiration.expireRegistration(first.registrationDocId), {
@@ -179,7 +196,7 @@ test('expiration releases capacity once and permits a new attempt', async () => 
   assert.equal((await db.doc('workshops/github-ai').get()).data().occupied, 0);
   assert.equal((await db.collection('registrationLocks').get()).size, 0);
 
-  const createAgain = createRegistrationService({ db, clock: () => creationTime + 302_000 });
+  const createAgain = createRegistrationService({ db, clock: () => creationTime + 902_000 });
   await register(createAgain, { ...valid, year: 1 });
   capacity = (await db.doc('system/capacity').get()).data();
   assert.equal(capacity.eventOccupied, 1);
@@ -191,7 +208,7 @@ test('expiration sweep evaluates the stored deadline and remains idempotent', as
   const creationTime = 1_800_000_000_000;
   const create = createRegistrationService({ db, clock: () => creationTime });
   await register(create, valid);
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
   assert.deepEqual(await expiration.expirePendingReservations(), { examined: 1, expired: 1 });
   assert.deepEqual(await expiration.expirePendingReservations(), { examined: 0, expired: 0 });
   assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 0);

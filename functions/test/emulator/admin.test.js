@@ -58,7 +58,7 @@ async function seedReportingData() {
     isHosteller: true, hostel: 'HOLY_CROSS', needsStay: false, stayType: null, baseFee: 799,
     stayFee: 0, totalFee: 799, paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING',
     paymentReconciliationRequired: true, capacityReleased: false, recoveryTokenHash: 'must-not-leak',
-    seatReservationExpiresAt: Timestamp.fromDate(new Date('2026-09-19T10:05:00.000Z')), createdAt: now, updatedAt: now,
+    seatReservationExpiresAt: Timestamp.fromDate(new Date('2026-09-19T10:15:00.000Z')), createdAt: now, updatedAt: now,
   });
   batch.set(db.doc('payments/pay_admin'), {
     registrationId: 'VYR26-ADMIN-1', razorpayOrderId: 'order_admin', razorpayPaymentId: 'pay_admin',
@@ -87,6 +87,11 @@ before(async () => {
       checkinService: createCheckinService({ db, ticketService, clock: () => Date.parse('2026-09-19T11:05:00.000Z') }),
       confirmationEmailService: {
         retryByRegistrationId: async (registrationId) => ({ outcome: 'SENT', registrationId }),
+      },
+      manualReconciliationService: {
+        reconcile: async (registrationId, adminContext) => ({
+          outcome: 'CONFIRMED', registrationId, reconciledBy: adminContext.uid,
+        }),
       },
     }),
     logger: { error() {} },
@@ -162,6 +167,13 @@ test('CSV export requires authorization and neutralizes participant formulas', a
   assert.match(response.text, /"CSE","CSE A"/);
   assert.match(response.text, /"'@Formula"/);
   assert.match(response.text, /"Admin, Test"/);
+
+  const filtered = await request(app)
+    .get('/api/admin/export/registrations.csv?search=participant%40example.com&registrationStatus=CONFIRMED&year=1')
+    .set('Authorization', `Bearer ${token}`);
+  assert.equal(filtered.status, 200);
+  assert.match(filtered.text, /"Admin, Test"/);
+  assert.doesNotMatch(filtered.text, /'@Formula/);
 });
 
 test('check-in API requires staff authorization and ignores no client-supplied staff identity', async () => {
@@ -194,4 +206,32 @@ test('confirmation email retry endpoint requires an active staff identity', asyn
   const response = await request(app).post(path).set('Authorization', `Bearer ${token}`);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, { outcome: 'SENT', registrationId: 'VYR26-ADMIN-1' });
+});
+
+test('manual payment reconciliation requires an active ADMIN and rejects COORDINATOR', async () => {
+  const path = '/api/admin/registrations/VYR26-ADMIN-1/reconcile-payment';
+  assert.equal((await request(app).post(path)).status, 401);
+
+  const inactive = await createIdentity('inactive-reconcile@example.com');
+  await db.doc(`admins/${inactive.user.uid}`).set({
+    name: 'Inactive Admin', email: inactive.user.email, role: 'ADMIN', active: false,
+  });
+  assert.equal((await request(app).post(path).set('Authorization', `Bearer ${inactive.token}`)).status, 403);
+
+  const coordinator = await createIdentity('coordinator-reconcile@example.com');
+  await db.doc(`admins/${coordinator.user.uid}`).set({
+    name: 'Coordinator', email: coordinator.user.email, role: 'COORDINATOR', active: true,
+  });
+  const denied = await request(app).post(path).set('Authorization', `Bearer ${coordinator.token}`);
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.error.code, 'FORBIDDEN');
+
+  const administrator = await createIdentity('admin-reconcile@example.com');
+  await db.doc(`admins/${administrator.user.uid}`).set({
+    name: 'Administrator', email: administrator.user.email, role: 'ADMIN', active: true,
+  });
+  const allowed = await request(app).post(path).set('Authorization', `Bearer ${administrator.token}`);
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.body.data.outcome, 'CONFIRMED');
+  assert.equal(allowed.body.data.reconciledBy, administrator.user.uid);
 });

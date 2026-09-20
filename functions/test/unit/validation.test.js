@@ -103,6 +103,17 @@ test('rejects invalid hosteller and stay combinations', () => {
   }
 });
 
+test('accepts PG/House Near College as an existing hosteller location', () => {
+  const result = validateAndNormalizeRegistration({
+    ...valid,
+    isHosteller: true,
+    hostel: 'PG_HOUSE_NEAR_COLLEGE',
+    needsStay: false,
+    stayType: null,
+  });
+  assert.equal(result.hostel, 'PG_HOUSE_NEAR_COLLEGE');
+});
+
 test('requires an IEEE ID for members and null for non-members', () => {
   assert.equal(errorFor({ ...valid, ieeeMember: true, ieeeMembershipId: '' }).code, 'INVALID_PARTICIPANT_DATA');
   assert.equal(errorFor({ ...valid, ieeeMembershipId: '12345' }).code, 'INVALID_PARTICIPANT_DATA');

@@ -4,7 +4,9 @@ import express from 'express';
 import request from 'supertest';
 import { createAdminAuthorization } from '../../src/middleware/admin-auth.js';
 import { createAdminRouter } from '../../src/routes/admin.js';
-import { buildDashboard, publicRegistration, registrationsCsv } from '../../src/services/admin-reporting.js';
+import {
+  buildDashboard, filterRegistrationsForExport, publicRegistration, registrationsCsv,
+} from '../../src/services/admin-reporting.js';
 
 function fakeDb(profile) {
   return { collection: () => ({ doc: () => ({ get: async () => ({ exists: Boolean(profile), data: () => profile }) }) }) };
@@ -47,7 +49,7 @@ for (const role of ['ADMIN', 'COORDINATOR']) {
 
 test('dashboard metrics distinguish operational capacity, registration states and payment attempts', () => {
   const registrations = [
-    { registrationId: '1', registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', year: 1, ieeeMember: true, workshopId: 'github-ai', isHosteller: true, hostel: 'SANJOSE', needsStay: false },
+    { registrationId: '1', registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', year: 1, ieeeMember: true, workshopId: 'github-ai', isHosteller: true, hostel: 'PG_HOUSE_NEAR_COLLEGE', needsStay: false },
     { registrationId: '2', registrationStatus: 'PAYMENT_PENDING', paymentStatus: 'PENDING', year: 2, ieeeMember: false, workshopId: 'github-ai', isHosteller: false, needsStay: true, stayType: 'AC' },
     { registrationId: '3', registrationStatus: 'EXPIRED', paymentStatus: 'PENDING', year: 1, ieeeMember: false, workshopId: 'data-science', isHosteller: false, needsStay: true, stayType: 'NON_AC', paymentReconciliationRequired: true },
   ];
@@ -66,6 +68,7 @@ test('dashboard metrics distinguish operational capacity, registration states an
   assert.equal(result.workshops.find((item) => item.id === 'github-ai').active, 2);
   assert.equal(result.accommodation.activeAcRequests, 1);
   assert.equal(result.accommodation.activeNonAcRequests, 0);
+  assert.equal(result.accommodation.hostels.PG_HOUSE_NEAR_COLLEGE, 1);
 });
 
 test('admin registration response omits recovery and order-coordination internals', () => {
@@ -86,7 +89,7 @@ test('CSV uses expected columns, escapes values and neutralizes spreadsheet form
   const csv = registrationsCsv([{
     registrationId: 'VYR26-1', fullName: '=HYPERLINK("bad")', email: 'a,b@example.com', phone: '+123',
     year: 1, department: 'ADS', class: 'ADS B', ieeeMember: true, ieeeMembershipId: 'IEEE\n"quoted"', workshopId: 'github-ai',
-    isHosteller: false, hostel: null, needsStay: false, stayType: null, baseFee: 399, stayFee: 0,
+    isHosteller: true, hostel: 'PG_HOUSE_NEAR_COLLEGE', needsStay: false, stayType: null, baseFee: 399, stayFee: 0,
     totalFee: 399, paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING',
     razorpayOrderId: null, razorpayPaymentId: null, paymentReconciliationRequired: false,
     createdAt: '2026-09-19T00:00:00.000Z', confirmedAt: null, expiredAt: null,
@@ -94,8 +97,65 @@ test('CSV uses expected columns, escapes values and neutralizes spreadsheet form
   assert.match(csv, /^"registrationId","fullName"/);
   assert.match(csv, /"year","department","class","ieeeMember"/);
   assert.match(csv, /"ADS","ADS B"/);
+  assert.match(csv, /"PG_HOUSE_NEAR_COLLEGE"/);
   assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
   assert.match(csv, /"a,b@example.com"/);
   assert.match(csv, /"'\+123"/);
   assert.match(csv, /"IEEE\n""quoted"""/);
+});
+
+const exportRegistrations = [
+  {
+    registrationId: 'VYR26-ALPHA', fullName: 'Alpha Participant', email: 'alpha@example.com', phone: '9000000001',
+    year: 1, department: 'CSE', class: 'CSE A', ieeeMember: true, workshopId: 'github-ai',
+    isHosteller: true, hostel: 'SANJOSE', needsStay: false, stayType: null,
+    registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', paymentReconciliationRequired: false,
+    attendance: { event: { checkedInAt: '2026-10-09T04:00:00.000Z' }, workshop: null },
+  },
+  {
+    registrationId: 'VYR26-BETA', fullName: 'Beta Participant', email: 'beta@example.com', phone: '9000000002',
+    year: 2, department: 'ECE', class: 'ECE', ieeeMember: false, workshopId: 'data-science',
+    isHosteller: false, hostel: null, needsStay: true, stayType: 'AC',
+    registrationStatus: 'PAYMENT_PENDING', paymentStatus: 'PENDING', paymentReconciliationRequired: true,
+    attendance: { event: null, workshop: null },
+  },
+  {
+    registrationId: 'VYR26-GAMMA', fullName: 'Gamma Participant', email: 'gamma@example.com', phone: '9000000003',
+    year: 1, department: 'ADS', class: 'ADS A', ieeeMember: false, workshopId: 'data-science',
+    isHosteller: false, hostel: null, needsStay: true, stayType: 'NON_AC',
+    registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', paymentReconciliationRequired: false,
+    attendance: { event: null, workshop: { checkedInAt: '2026-10-09T09:00:00.000Z' } },
+  },
+];
+
+function exportedIds(filters) {
+  return filterRegistrationsForExport(exportRegistrations, filters).map((item) => item.registrationId);
+}
+
+test('CSV export with no filters includes every registration', () => {
+  assert.deepEqual(exportedIds({}), ['VYR26-ALPHA', 'VYR26-BETA', 'VYR26-GAMMA']);
+});
+
+test('CSV export applies one active filter', () => {
+  assert.deepEqual(exportedIds({ registrationStatus: 'PAYMENT_PENDING' }), ['VYR26-BETA']);
+});
+
+test('CSV export combines multiple active filters', () => {
+  assert.deepEqual(exportedIds({ registrationStatus: 'CONFIRMED', year: '1', ieee: 'false' }), ['VYR26-GAMMA']);
+});
+
+test('CSV export applies search using dashboard search semantics', () => {
+  assert.deepEqual(exportedIds({ search: 'cse a' }), ['VYR26-ALPHA']);
+});
+
+test('CSV export combines search and dropdown filters', () => {
+  assert.deepEqual(exportedIds({ search: 'example.com', year: '1', stayType: 'NON_AC' }), ['VYR26-GAMMA']);
+});
+
+test('CSV export with zero matches produces an empty filtered result', () => {
+  const filtered = filterRegistrationsForExport(exportRegistrations, {
+    search: 'alpha', registrationStatus: 'PAYMENT_PENDING',
+  });
+  assert.deepEqual(filtered, []);
+  assert.equal(registrationsCsv(filtered).trim().split('\r\n').length, 1);
 });

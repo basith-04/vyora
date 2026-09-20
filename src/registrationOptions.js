@@ -8,6 +8,7 @@ export const hostels = [
   { id: 'SANTHOME', label: 'Santhome' },
   { id: 'HOLY_CROSS', label: 'Holy Cross' },
   { id: 'ALPHONSA', label: 'Alphonsa' },
+  { id: 'PG_HOUSE_NEAR_COLLEGE', label: 'PG/House Near College' },
 ];
 
 export const workshops = [

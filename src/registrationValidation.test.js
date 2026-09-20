@@ -63,6 +63,9 @@ test('department changes reset class to a valid canonical value', () => {
 });
 
 test('calculates every IEEE and accommodation combination', () => {
+  assert.deepEqual(hostels.find((hostel) => hostel.id === 'PG_HOUSE_NEAR_COLLEGE'), {
+    id: 'PG_HOUSE_NEAR_COLLEGE', label: 'PG/House Near College',
+  });
   for (const hostel of hostels) {
     const ieeeHosteller = { ...valid, ieeeMember: true, ieeeMembershipId: '12345', isHosteller: true, hostel: hostel.id, needsStay: false };
     const nonIeeeHosteller = { ...ieeeHosteller, ieeeMember: false, ieeeMembershipId: null };

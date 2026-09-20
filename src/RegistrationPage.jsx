@@ -224,6 +224,16 @@ export default function RegistrationPage() {
       setPhase(phaseForApiError(error));
     }
   };
+  const continueRegistration = async (data, token) => {
+    applyReservation(data, token);
+    if (data.registrationStatus === 'CONFIRMED' && data.paymentStatus === 'PAID') {
+      setPhase(FLOW_PHASE.confirmed);
+      setFlowMessage('Your earlier payment was recovered and confirmed.');
+      await loadTicket(data.registrationId, token);
+      return;
+    }
+    await runCheckout(data, token);
+  };
   const onSubmit = async (event) => {
     event.preventDefault();
     if (phase !== FLOW_PHASE.form || isBusyPhase(phase) || submissionInFlight.current) return;
@@ -245,8 +255,7 @@ export default function RegistrationPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       const data = await registrationApi.create(buildRegistrationSubmission(form), token);
-      applyReservation(data, token);
-      await runCheckout(data, token);
+      await continueRegistration(data, token);
     } catch (error) {
       setFlowMessage(error.message);
       setPhase(phaseForApiError(error));
@@ -303,8 +312,7 @@ export default function RegistrationPage() {
       const data = reservation
         ? await registrationApi.retry(reservation.registrationId, token)
         : await registrationApi.create(buildRegistrationSubmission(form), token);
-      applyReservation(data, token);
-      await runCheckout(data, token);
+      await continueRegistration(data, token);
     } catch (error) {
       setFlowMessage(error.message);
       setPhase(phaseForApiError(error));

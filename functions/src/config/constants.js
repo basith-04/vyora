@@ -30,6 +30,18 @@ export const HOSTELS = Object.freeze([
 export const STAY_TYPES = Object.freeze(['AC', 'NON_AC']);
 export const YEARS = Object.freeze([1, 2, 3, 4]);
 
+export const DEPARTMENT_CLASSES = Object.freeze({
+  ADS: Object.freeze(['ADS A', 'ADS B']),
+  CSE: Object.freeze(['CSE A', 'CSE B', 'CSE C', 'CSE D']),
+  CSD: Object.freeze(['CSD']),
+  CSBS: Object.freeze(['CSBS']),
+  'CS & CY': Object.freeze(['CS & CY']),
+  ECE: Object.freeze(['ECE']),
+  'ME/CE': Object.freeze(['ME/CE']),
+  EEE: Object.freeze(['EEE']),
+  AEI: Object.freeze(['AEI']),
+});
+
 export const REGISTRATION_STATUS = Object.freeze({
   paymentPending: 'PAYMENT_PENDING',
   confirmed: 'CONFIRMED',

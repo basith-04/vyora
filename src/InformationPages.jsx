@@ -3,7 +3,7 @@ import './information-pages.css';
 
 const organizer = 'IEEE Student Branch VJEC';
 const address = ['Vimal Jyothi Engineering College', 'Chemperi, Kannur, Kerala, India'];
-const email = 'contact@ieeesbvjec.in';
+const email = 'ieeesb@vjec.ac.in';
 
 const policyPages = {
   '/about-us': {
@@ -47,12 +47,32 @@ const policyPages = {
     intro: "This policy applies to VYORA '26 registration cancellation and refund requests.",
     // TODO: If the payment provider requires a refund-processing timeline for production submission, obtain the organizer-approved timeline before publishing it.
     sections: [
-      { heading: 'CANCELLATION WINDOW', paragraphs: ['Attendees may cancel their VYORA \'26 registration and request a refund until 7 days before the event begins. Cancellation and refund requests must be submitted at least 7 days before the event begins.', 'Once the registration enters the final 7-day period before the event begins, cancellations and refunds will not be entertained.'] },
-      { heading: 'REFUND PROCESSING', paragraphs: ["Approved refunds will be initiated within 7 business days of approval. After initiation, the time taken for the amount to reflect in the attendee's account may depend on the original payment method and banking/payment provider."] },
-      { heading: 'HOW TO REQUEST', paragraphs: [`Requests should be sent to ${email}. Please include sufficient registration details and payment information so the organizers can identify the registration.`], email: true },
-      { heading: 'PAYMENT ISSUES', bullets: ['Duplicate payments should be reported to the same email with the relevant registration and payment details.', 'If payment has been deducted but the registration or payment status has not updated, contact the organizers with the transaction details so it can be reviewed.'] },
-      { heading: 'EVENT CANCELLATION', paragraphs: ['If the event is cancelled by IEEE Student Branch VJEC, affected attendees will be informed regarding the applicable refund process.'] },
-    ],
+  {
+    heading: 'NO CANCELLATION',
+    paragraphs: [
+      "Once a registration for VYORA '26 has been successfully completed and payment has been made, the registration cannot be cancelled."
+    ]
+  },
+  {
+    heading: 'NO REFUND',
+    paragraphs: [
+      "Registration fees paid for VYORA '26 are non-refundable. No refund will be provided if a registered participant is unable to attend the event for any reason."
+    ]
+  },
+  {
+    heading: 'PAYMENT ISSUES',
+    bullets: [
+      'Duplicate payments should be reported to the same email with the relevant registration and payment details.',
+      'If payment has been deducted but the registration or payment status has not updated, contact the organizers with the transaction details so it can be reviewed.'
+    ]
+  },
+  {
+    heading: 'EVENT CANCELLATION',
+    paragraphs: [
+      'If the event is cancelled by IEEE Student Branch VJEC, affected attendees will be informed regarding the applicable refund process.'
+    ]
+  }
+],
   },
   '/shipping-and-delivery': {
     title: 'SHIPPING & DELIVERY',

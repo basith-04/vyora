@@ -6,7 +6,7 @@ import './register.css';
 
 const tiers = [
   { id: 'ieee', label: 'IEEE MEMBER', lines: ['IEEE MEMBER', 'STANDARD'], price: registrationOptions.prices.ieee },
-  { id: 'non-ieee', label: 'NON-IEEE', lines: ['STANDARD', 'NON-IEEE'], price: registrationOptions.prices.nonIeee },
+  { id: 'non-ieee', label: 'NON-IEEE', lines: ['NON-IEEE', 'STANDARD'], price: registrationOptions.prices.nonIeee },
 ];
 
 function MemberIcon() {

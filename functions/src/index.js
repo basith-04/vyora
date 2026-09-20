@@ -17,6 +17,7 @@ import { createTicketService } from './services/ticket.js';
 import { createCheckinService } from './services/checkin.js';
 import { createResendEmailProvider } from './services/email-provider.js';
 import { createConfirmationEmailService } from './services/confirmation-email.js';
+import { createManualReconciliationService } from './services/manual-reconciliation.js';
 
 const razorpayKeyId = defineSecret('RAZORPAY_KEY_ID');
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
@@ -31,9 +32,6 @@ const expirationService = createExpirationService({ db });
 const razorpay = createRazorpayGateway({
   getKeyId: () => razorpayKeyId.value(),
   getKeySecret: () => razorpayKeySecret.value(),
-});
-const checkoutService = createCheckoutService({
-  db, createRegistration, expirationService, razorpay, logger,
 });
 const ticketService = createTicketService({
   db,
@@ -57,9 +55,19 @@ const paymentService = createPaymentService({
   confirmationEmailService,
   logger,
 });
+const checkoutService = createCheckoutService({
+  db, createRegistration, expirationService, razorpay, paymentService, logger,
+});
 const webhookService = createWebhookService({
   paymentService,
   getWebhookSecret: () => razorpayWebhookSecret.value(),
+  logger,
+});
+const manualReconciliationService = createManualReconciliationService({
+  db,
+  razorpay,
+  ticketService,
+  confirmationEmailService,
   logger,
 });
 const adminRouter = createAdminRouter({
@@ -67,6 +75,7 @@ const adminRouter = createAdminRouter({
   reportingService: createAdminReportingService({ db }),
   checkinService: createCheckinService({ db, ticketService }),
   confirmationEmailService,
+  manualReconciliationService,
 });
 
 export const api = onRequest(

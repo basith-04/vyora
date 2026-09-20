@@ -10,7 +10,7 @@ import { verifyCheckoutSignature } from './signatures.js';
 
 const CURRENCY = 'INR';
 
-function asTimestamp(now) {
+export function asTimestamp(now) {
   return Timestamp.fromMillis(typeof now === 'number' ? now : now.getTime());
 }
 
@@ -21,11 +21,11 @@ function requiredString(value, field) {
   return value;
 }
 
-function mergeUnique(values = [], value) {
+export function mergeUnique(values = [], value) {
   return value && !values.includes(value) ? [...values, value] : values;
 }
 
-function paymentDocument(payment, registrationDocId, registration, source, eventId, now, reconciliationRequired) {
+export function paymentDocument(payment, registrationDocId, registration, source, eventId, now, reconciliationRequired) {
   return {
     registrationDocId,
     registrationId: registration.registrationId,
@@ -44,7 +44,7 @@ function paymentDocument(payment, registrationDocId, registration, source, event
   };
 }
 
-function assertRemotePayment(registration, payment, order) {
+export function assertRemotePayment(registration, payment, order) {
   if (payment.order_id !== registration.razorpayOrderId || order.id !== registration.razorpayOrderId) {
     throw new AppError('PAYMENT_VERIFICATION_FAILED', 'The payment does not belong to this registration.', 409);
   }
@@ -248,6 +248,58 @@ export function createPaymentService({
     return confirmFetchedPayment(ref, payment, order, context);
   }
 
+  async function findCapturedForRegistrationRef(ref) {
+    const snapshot = await ref.get();
+    if (!snapshot.exists) {
+      throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
+    }
+    const registration = snapshot.data();
+    if (!registration.razorpayOrderId) return { outcome: 'NO_ORDER' };
+
+    let order;
+    let collection;
+    let storedPayment = null;
+    try {
+      [order, collection, storedPayment] = await Promise.all([
+        razorpay.fetchOrder(registration.razorpayOrderId),
+        razorpay.fetchPaymentsForOrder(registration.razorpayOrderId),
+        registration.razorpayPaymentId
+          ? razorpay.fetchPayment(registration.razorpayPaymentId)
+          : Promise.resolve(null),
+      ]);
+    } catch (error) {
+      logger.error('Razorpay retry recovery fetch failed.', {
+        registrationId: registration.registrationId,
+        operation: 'recover_pending_payment',
+        result: 'failed',
+        code: error?.code || 'RAZORPAY_FETCH_FAILED',
+      });
+      throw new AppError('PAYMENT_VERIFICATION_FAILED', 'The previous payment attempt could not be checked safely.', 502);
+    }
+
+    const payments = new Map();
+    for (const payment of [...(collection?.items || []), ...(storedPayment ? [storedPayment] : [])]) {
+      if (payment?.id) payments.set(payment.id, payment);
+    }
+    const captured = [...payments.values()].filter((payment) => (
+      payment.status === 'captured' && payment.captured === true
+    ));
+    if (captured.length > 1) {
+      throw new AppError('PAYMENT_REQUIRES_RECONCILIATION', 'Multiple captured payments require organizer review.', 409);
+    }
+    if (captured.length === 0) {
+      if (order.status === 'paid' || [...payments.values()].some((payment) => payment.status === 'authorized')) {
+        throw new AppError('PAYMENT_REQUIRES_RECONCILIATION', 'The previous payment attempt requires organizer review.', 409);
+      }
+      return { outcome: 'NO_CAPTURED_PAYMENT', registration, order };
+    }
+    if (registration.razorpayPaymentId && registration.razorpayPaymentId !== captured[0].id) {
+      throw new AppError('PAYMENT_REQUIRES_RECONCILIATION', 'The recorded payment conflicts with Razorpay.', 409);
+    }
+    assertRemotePayment(registration, captured[0], order);
+    return { outcome: 'CAPTURED', registration, payment: captured[0], order };
+  }
+
   async function verifyFromFrontend(input, recoveryTokenHash) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       throw new AppError('PAYMENT_VERIFICATION_FAILED', 'Payment verification data is required.', 400);
@@ -337,5 +389,6 @@ export function createPaymentService({
     processCapturedWebhook,
     recordFailedWebhook,
     confirmFetchedPayment,
+    findCapturedForRegistrationRef,
   };
 }

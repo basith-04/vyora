@@ -42,7 +42,12 @@ async function seed() {
   await batch.commit();
 }
 
-function fakeGateway({ createFailure = false, paymentOverrides = {}, orderOverrides = {} } = {}) {
+function fakeGateway({
+  createFailure = false,
+  paymentOverrides = {},
+  orderOverrides = {},
+  orderPayments = [],
+} = {}) {
   const orders = new Map();
   let createCalls = 0;
   return {
@@ -71,6 +76,10 @@ function fakeGateway({ createFailure = false, paymentOverrides = {}, orderOverri
         receipt: registration.registrationId, status: 'paid', ...orderOverrides,
       };
     },
+    async fetchPaymentsForOrder() {
+      const items = typeof orderPayments === 'function' ? await orderPayments() : orderPayments;
+      return { entity: 'collection', count: items.length, items };
+    },
   };
 }
 
@@ -98,6 +107,24 @@ function paymentService(
   return createPaymentService({
     db, razorpay: gateway, getKeySecret: () => keySecret,
     ticketService, confirmationEmailService, clock, logger: { error() {} },
+  });
+}
+
+function checkoutWithPaymentRecovery(
+  gateway,
+  clock,
+  ticketService = null,
+  confirmationEmailService = null,
+) {
+  const payments = paymentService(gateway, clock, ticketService, confirmationEmailService);
+  return createCheckoutService({
+    db,
+    createRegistration: createRegistrationService({ db, clock }),
+    expirationService: createExpirationService({ db, clock }),
+    razorpay: gateway,
+    paymentService: payments,
+    clock,
+    logger: { error() {} },
   });
 }
 
@@ -182,10 +209,85 @@ test('client amount injection is rejected before order creation', async () => {
   assert.equal(gateway.createCalls, 0);
 });
 
+test('new registration is rejected while registration is closed before order creation', async () => {
+  const gateway = fakeGateway();
+  await db.doc('system/registration-config').update({ registrationOpen: false });
+  const checkout = createCheckoutService({
+    db,
+    createRegistration: createRegistrationService({ db, clock: () => creationTime }),
+    expirationService: createExpirationService({ db, clock: () => creationTime }),
+    razorpay: gateway,
+    clock: () => creationTime,
+    logger: { error() {} },
+  });
+
+  await assert.rejects(
+    checkout.start(valid, recoveryTokenHash),
+    (error) => error.code === 'REGISTRATION_CLOSED',
+  );
+  assert.equal(gateway.createCalls, 0);
+  assert.equal((await db.collection('registrations').get()).size, 0);
+});
+
+test('existing pending registration cannot retry, resume, or expose Checkout while closed', async () => {
+  const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
+  const { result } = await createReadyRegistration(gateway);
+  await db.doc('system/registration-config').update({ registrationOpen: false });
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 1_000);
+
+  await assert.rejects(
+    checkout.retry(result.registrationId, recoveryTokenHash),
+    (error) => error.code === 'REGISTRATION_CLOSED',
+  );
+  await assert.rejects(
+    checkout.status(result.registrationId, recoveryTokenHash),
+    (error) => error.code === 'REGISTRATION_CLOSED',
+  );
+  await assert.rejects(
+    checkout.start(valid, 'b'.repeat(64)),
+    (error) => error.code === 'REGISTRATION_CLOSED',
+  );
+  assert.equal(gateway.createCalls, 1);
+});
+
+test('order creation re-checks registrationOpen immediately before calling Razorpay', async () => {
+  const createRegistration = createRegistrationService({ db, clock: () => creationTime });
+  const pending = await createRegistration(valid, { recoveryTokenHash });
+  const registrationRef = db.doc(`registrations/${pending.registrationDocId}`);
+  await registrationRef.update({ orderCreationStatus: 'FAILED' });
+
+  let createCalls = 0;
+  const gateway = {
+    getPublicKeyId: () => 'rzp_test_public',
+    async findOrderByReceipt() {
+      await db.doc('system/registration-config').update({ registrationOpen: false });
+      return null;
+    },
+    async createOrder() {
+      createCalls += 1;
+      throw new Error('Razorpay must not be called while registration is closed.');
+    },
+  };
+  const checkout = createCheckoutService({
+    db,
+    createRegistration,
+    expirationService: createExpirationService({ db, clock: () => creationTime }),
+    razorpay: gateway,
+    clock: () => creationTime,
+    logger: { error() {} },
+  });
+
+  await assert.rejects(
+    checkout.retry(pending.registrationId, recoveryTokenHash),
+    (error) => error.code === 'REGISTRATION_CLOSED',
+  );
+  assert.equal(createCalls, 0);
+});
+
 test('order creation failure remains bounded by normal idempotent expiration', async () => {
   const gateway = fakeGateway({ createFailure: true });
   const createRegistration = createRegistrationService({ db, clock: () => creationTime });
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
   const checkout = createCheckoutService({
     db, createRegistration, expirationService: expiration,
     razorpay: gateway, clock: () => creationTime, logger: { error() {} },
@@ -199,14 +301,14 @@ test('order creation failure remains bounded by normal idempotent expiration', a
 test('expired registration cannot open or create another order', async () => {
   const { result, gateway } = await createReadyRegistration();
   const registrationDoc = (await db.collection('registrations').limit(1).get()).docs[0];
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
   await expiration.expireRegistration(registrationDoc.id);
   const checkout = createCheckoutService({
     db,
-    createRegistration: createRegistrationService({ db, clock: () => creationTime + 301_000 }),
+    createRegistration: createRegistrationService({ db, clock: () => creationTime + 901_000 }),
     expirationService: expiration,
     razorpay: gateway,
-    clock: () => creationTime + 301_000,
+    clock: () => creationTime + 901_000,
     logger: { error() {} },
   });
   await assert.rejects(
@@ -214,6 +316,132 @@ test('expired registration cannot open or create another order', async () => {
     (error) => error.code === 'RESERVATION_EXPIRED',
   );
   assert.equal(gateway.createCalls, 1);
+});
+
+test('matching PENDING registration with an active reservation resumes the same order and seat', async () => {
+  const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
+  const { result } = await createReadyRegistration(gateway);
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 1_000);
+  const resumed = await checkout.start(valid, 'b'.repeat(64));
+  assert.equal(resumed.registrationId, result.registrationId);
+  assert.equal(resumed.checkout.orderId, result.checkout.orderId);
+  assert.equal(gateway.createCalls, 1);
+  assert.equal((await db.collection('registrations').get()).size, 1);
+  const capacity = (await db.doc('system/capacity').get()).data();
+  assert.equal(capacity.eventOccupied, 1);
+  assert.equal(capacity.firstYearOccupied, 1);
+  assert.equal((await db.doc('workshops/github-ai').get()).data().occupied, 1);
+});
+
+test('matching expired registration re-reserves the same document for a fresh 15 minutes', async () => {
+  const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
+  const { result } = await createReadyRegistration(gateway);
+  const registration = (await db.collection('registrations').limit(1).get()).docs[0];
+  await createExpirationService({ db, clock: () => creationTime + 901_000 }).expireRegistration(registration.id);
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 902_000);
+  const resumed = await checkout.start(valid, 'b'.repeat(64));
+  assert.equal(resumed.registrationId, result.registrationId);
+  assert.equal(resumed.checkout.orderId, result.checkout.orderId);
+  assert.equal(Date.parse(resumed.seatReservationExpiresAt), creationTime + 1_802_000);
+  assert.equal((await db.collection('registrations').get()).size, 1);
+  const capacity = (await db.doc('system/capacity').get()).data();
+  assert.equal(capacity.eventOccupied, 1);
+  assert.equal(capacity.firstYearOccupied, 1);
+  assert.equal((await db.doc('workshops/github-ai').get()).data().occupied, 1);
+});
+
+for (const scenario of [
+  { name: 'event', code: 'EVENT_FULL', capacity: { eventOccupied: 165 } },
+  { name: 'first-year', code: 'FIRST_YEAR_FULL', capacity: { firstYearOccupied: 55 } },
+  { name: 'workshop', code: 'WORKSHOP_FULL', workshop: { occupied: 55 } },
+]) {
+  test(`matching expired registration is rejected when ${scenario.name} capacity is full`, async () => {
+    const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
+    await createReadyRegistration(gateway);
+    const registration = (await db.collection('registrations').limit(1).get()).docs[0];
+    await createExpirationService({ db, clock: () => creationTime + 901_000 }).expireRegistration(registration.id);
+    if (scenario.capacity) await db.doc('system/capacity').update(scenario.capacity);
+    if (scenario.workshop) await db.doc('workshops/github-ai').update(scenario.workshop);
+    const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 902_000);
+    await assert.rejects(
+      checkout.start(valid, 'b'.repeat(64)),
+      (error) => error.code === scenario.code,
+    );
+    assert.equal((await db.collection('registrations').get()).size, 1);
+    assert.equal((await registration.ref.get()).data().registrationStatus, 'EXPIRED');
+    assert.equal(gateway.createCalls, 1);
+  });
+}
+
+test('concurrent expired retries re-reserve capacity once and reuse one registration/order', async () => {
+  const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
+  const { result } = await createReadyRegistration(gateway);
+  const registration = (await db.collection('registrations').limit(1).get()).docs[0];
+  await createExpirationService({ db, clock: () => creationTime + 901_000 }).expireRegistration(registration.id);
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 902_000);
+  const retries = await Promise.all([
+    checkout.start(valid, 'b'.repeat(64)),
+    checkout.start(valid, 'c'.repeat(64)),
+  ]);
+  assert.equal(new Set(retries.map((item) => item.registrationId)).size, 1);
+  assert.equal(retries[0].registrationId, result.registrationId);
+  assert.equal(gateway.createCalls, 1);
+  assert.equal((await db.collection('registrations').get()).size, 1);
+  const capacity = (await db.doc('system/capacity').get()).data();
+  assert.equal(capacity.eventOccupied, 1);
+  assert.equal(capacity.firstYearOccupied, 1);
+  assert.equal((await db.doc('workshops/github-ai').get()).data().occupied, 1);
+});
+
+test('captured previous payment is recovered without opening Checkout and issues one ticket/email', async () => {
+  const captured = [];
+  const gateway = fakeGateway({ orderPayments: captured, orderOverrides: { status: 'paid' } });
+  const { result } = await createReadyRegistration(gateway);
+  captured.push({
+    id: 'pay_retry_recovered',
+    order_id: result.checkout.orderId,
+    amount: result.checkout.amount,
+    currency: 'INR',
+    status: 'captured',
+    captured: true,
+  });
+  let emailCalls = 0;
+  const tickets = createTicketService({
+    db,
+    getSigningSecret: () => 'retry-recovery-ticket-signing-secret-value',
+    clock: () => creationTime + 2_000,
+  });
+  const email = createConfirmationEmailService({
+    db,
+    ticketService: tickets,
+    provider: { send: async () => { emailCalls += 1; return { providerMessageId: 'email_retry_recovered' }; } },
+    getPublicBaseUrl: () => 'https://vyora.example',
+    clock: () => creationTime + 2_000,
+    logger: { error() {} },
+  });
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 2_000, tickets, email);
+  const recovered = await checkout.start(valid, 'b'.repeat(64));
+  assert.equal(recovered.registrationId, result.registrationId);
+  assert.equal(recovered.registrationStatus, 'CONFIRMED');
+  assert.equal(recovered.paymentStatus, 'PAID');
+  assert.equal(recovered.checkout, undefined);
+  assert.equal(gateway.createCalls, 1);
+  assert.equal((await db.collection('tickets').get()).size, 1);
+  assert.equal((await db.collection('payments').get()).size, 1);
+  assert.equal(emailCalls, 1);
+});
+
+test('matching details for an already CONFIRMED registration remain rejected', async () => {
+  const gateway = fakeGateway();
+  const { result } = await createReadyRegistration(gateway);
+  await verify(paymentService(gateway), result, 'pay_confirmed_duplicate');
+  const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 2_000);
+  await assert.rejects(
+    checkout.start(valid, 'b'.repeat(64)),
+    (error) => error.code === 'DUPLICATE_REGISTRATION',
+  );
+  assert.equal((await db.collection('registrations').get()).size, 1);
+  assert.equal((await db.doc('system/capacity').get()).data().eventOccupied, 1);
 });
 
 test('valid verification confirms once without changing capacity', async () => {
@@ -324,9 +552,9 @@ test('invalid signature, wrong order association, and amount mismatch never conf
 test('expiration winning before captured payment produces reconciliation without reclaiming a seat', async () => {
   const { result, gateway } = await createReadyRegistration();
   const registrationDoc = (await db.collection('registrations').limit(1).get()).docs[0];
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
   assert.equal((await expiration.expireRegistration(registrationDoc.id)).outcome, 'EXPIRED');
-  const service = paymentService(gateway, () => creationTime + 302_000);
+  const service = paymentService(gateway, () => creationTime + 902_000);
   await assert.rejects(verify(service, result, 'pay_late'), (error) => error.code === 'PAYMENT_REQUIRES_RECONCILIATION');
   const registration = (await registrationDoc.ref.get()).data();
   assert.equal(registration.registrationStatus, 'EXPIRED');
@@ -338,8 +566,8 @@ test('expiration winning before captured payment produces reconciliation without
 test('payment confirmation and expiration race cannot produce conflicting capacity state', async () => {
   const { result, gateway } = await createReadyRegistration();
   const registrationDoc = (await db.collection('registrations').limit(1).get()).docs[0];
-  const expiration = createExpirationService({ db, clock: () => creationTime + 301_000 });
-  const service = paymentService(gateway, () => creationTime + 301_000);
+  const expiration = createExpirationService({ db, clock: () => creationTime + 901_000 });
+  const service = paymentService(gateway, () => creationTime + 901_000);
   await Promise.allSettled([
     expiration.expireRegistration(registrationDoc.id),
     verify(service, result, 'pay_race'),

@@ -237,7 +237,7 @@ function ChapterBoundary() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
-  const isAdmin = activePath === '/admin';
+  const isAdmin = activePath === '/admin' || activePath === '/admin/check-in';
   const isPolicy = informationPaths.has(activePath);
   const isStandalone = isRegistration || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);

@@ -4,8 +4,8 @@ import { defaultFilters, filterRegistrations, readableStatus } from './adminData
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 
 const registrations = [
-  { registrationId: 'VYR26-ALPHA', fullName: 'Alpha Person', email: 'alpha@example.com', phone: '9876500001', year: 1, ieeeMember: true, workshopId: 'data-science', isHosteller: true, hostel: 'SANJOSE', needsStay: false, stayType: null, paymentStatus: 'PAID', registrationStatus: 'CONFIRMED', paymentReconciliationRequired: false },
-  { registrationId: 'VYR26-BETA', fullName: 'Beta Person', email: 'beta@example.com', phone: '9876500002', year: 3, ieeeMember: false, workshopId: 'github-ai', isHosteller: false, hostel: null, needsStay: true, stayType: 'AC', paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING', paymentReconciliationRequired: true },
+  { registrationId: 'VYR26-ALPHA', fullName: 'Alpha Person', email: 'alpha@example.com', phone: '9876500001', year: 1, ieeeMember: true, workshopId: 'data-science', isHosteller: true, hostel: 'SANJOSE', needsStay: false, stayType: null, paymentStatus: 'PAID', registrationStatus: 'CONFIRMED', paymentReconciliationRequired: false, attendance: { event: { checkedInAt: '2026-10-09T09:00:00Z' }, workshop: null } },
+  { registrationId: 'VYR26-BETA', fullName: 'Beta Person', email: 'beta@example.com', phone: '9876500002', year: 3, ieeeMember: false, workshopId: 'github-ai', isHosteller: false, hostel: null, needsStay: true, stayType: 'AC', paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING', paymentReconciliationRequired: true, attendance: { event: null, workshop: { checkedInAt: '2026-10-09T14:00:00Z' } } },
 ];
 
 test('admin search covers registration ID, name, email and phone case-insensitively', () => {
@@ -17,7 +17,7 @@ test('admin search covers registration ID, name, email and phone case-insensitiv
 test('every important admin filter category and combined filtering works', () => {
   const cases = {
     registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', year: '1', ieee: 'true',
-    workshopId: 'data-science', hosteller: 'true', hostel: 'SANJOSE', stay: 'false', reconciliation: 'false',
+    workshopId: 'data-science', hosteller: 'true', hostel: 'SANJOSE', stay: 'false', reconciliation: 'false', eventCheckin: 'true', workshopCheckin: 'false',
   };
   for (const [name, value] of Object.entries(cases)) {
     assert.deepEqual(filterRegistrations(registrations, '', { ...defaultFilters, [name]: value }).map((item) => item.registrationId), ['VYR26-ALPHA']);

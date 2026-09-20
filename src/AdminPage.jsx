@@ -10,6 +10,7 @@ import {
   workshopLabels,
 } from './adminData.js';
 import './admin.css';
+import CheckInView from './CheckInView.jsx';
 
 const statusOptions = ['PAYMENT_PENDING', 'CONFIRMED', 'PAYMENT_FAILED', 'EXPIRED', 'CANCELLED'];
 const paymentOptions = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
@@ -84,6 +85,7 @@ function Overview({ dashboard }) {
           <Metric label="Cancelled" value={registration.CANCELLED} />
         </div>
       </section>
+      <section className="admin-panel"><div className="panel-heading"><h2>Attendance</h2><span>Recorded trusted check-ins</span></div><div className="metric-grid compact"><Metric label="Event checked in" value={dashboard.attendance?.event} tone="good" /><Metric label="Workshop checked in" value={dashboard.attendance?.workshop} tone="good" /></div></section>
       <section className="admin-panel"><div className="panel-heading"><h2>Operational capacity</h2><span>Counters include pending reservations</span></div>
         <CapacityBar label="Event" {...dashboard.capacity.event} />
         <CapacityBar label="First year" {...dashboard.capacity.firstYear} />
@@ -114,7 +116,7 @@ function RegistrationTable({ registrations, onOpen }) {
   return (
     <div className="registration-table-wrap">
       <table className="registration-table">
-        <thead><tr><th>Registration</th><th>Participant</th><th>Year</th><th>Workshop</th><th>Stay</th><th>Fee</th><th>Payment</th><th>Status</th><th>Created</th></tr></thead>
+        <thead><tr><th>Registration</th><th>Participant</th><th>Year</th><th>Workshop</th><th>Stay</th><th>Fee</th><th>Payment</th><th>Status</th><th>Attendance</th><th>Created</th></tr></thead>
         <tbody>{registrations.map((item) => <tr key={item.registrationId} onClick={() => onOpen(item.registrationId)} tabIndex="0" onKeyDown={(event) => { if (event.key === 'Enter') onOpen(item.registrationId); }}>
           <td data-label="Registration"><strong>{item.registrationId}</strong>{item.paymentReconciliationRequired && <span className="table-attention">ATTENTION</span>}</td>
           <td data-label="Participant"><strong>{item.fullName}</strong><small>{item.email}<br />{item.phone}</small></td>
@@ -124,6 +126,7 @@ function RegistrationTable({ registrations, onOpen }) {
           <td data-label="Fee">₹{item.totalFee}</td>
           <td data-label="Payment"><StatusBadge value={item.paymentStatus} /></td>
           <td data-label="Status"><StatusBadge value={item.registrationStatus} /></td>
+          <td data-label="Attendance"><small>Event: {item.attendance?.event ? '✓' : '—'}<br />Workshop: {item.attendance?.workshop ? '✓' : '—'}</small></td>
           <td data-label="Created">{formatDate(item.createdAt)}</td>
         </tr>)}</tbody>
       </table>
@@ -151,6 +154,8 @@ function RegistrationsView({ registrations, onOpen }) {
       <FilterSelect label="Stay" name="stay" value={filters.stay} onChange={change}><option value="true">Needs Stay</option><option value="false">No Stay</option></FilterSelect>
       <FilterSelect label="Stay type" name="stayType" value={filters.stayType} onChange={change}><option value="AC">AC</option><option value="NON_AC">Non-AC</option></FilterSelect>
       <FilterSelect label="Reconciliation" name="reconciliation" value={filters.reconciliation} onChange={change}><option value="true">Required</option><option value="false">Not Required</option></FilterSelect>
+      <FilterSelect label="Event check-in" name="eventCheckin" value={filters.eventCheckin} onChange={change}><option value="true">Checked in</option><option value="false">Not checked in</option></FilterSelect>
+      <FilterSelect label="Workshop check-in" name="workshopCheckin" value={filters.workshopCheckin} onChange={change}><option value="true">Checked in</option><option value="false">Not checked in</option></FilterSelect>
     </div>
     <RegistrationTable registrations={result} onOpen={onOpen} />
   </section>;
@@ -188,6 +193,7 @@ function Detail({ registration, loading, onClose }) {
       <div className="detail-section"><h3>Accommodation</h3><dl><dt>Hosteller</dt><dd>{registration.isHosteller ? 'Yes' : 'No'}</dd><dt>Hostel</dt><dd>{hostelLabels[registration.hostel] || '—'}</dd><dt>Needs stay</dt><dd>{registration.needsStay ? 'Yes' : 'No'}</dd><dt>Stay type</dt><dd>{readableStatus(registration.stayType)}</dd></dl></div>
       <div className="detail-section"><h3>Pricing & payment</h3><dl><dt>Base fee</dt><dd>₹{registration.baseFee}</dd><dt>Stay fee</dt><dd>₹{registration.stayFee}</dd><dt>Total</dt><dd>₹{registration.totalFee}</dd><dt>Payment</dt><dd><StatusBadge value={registration.paymentStatus} /></dd><dt>Registration</dt><dd><StatusBadge value={registration.registrationStatus} /></dd><dt>Razorpay order</dt><dd className="breakable">{registration.razorpayOrderId || '—'}</dd><dt>Razorpay payment</dt><dd className="breakable">{registration.razorpayPaymentId || registration.payment?.razorpayPaymentId || '—'}</dd><dt>Gateway status</dt><dd>{readableStatus(registration.payment?.status)}</dd><dt>Gateway amount</dt><dd>{registration.payment?.amount != null ? `₹${(registration.payment.amount / 100).toFixed(2)} ${registration.payment.currency || ''}` : '—'}</dd><dt>Reconciliation</dt><dd>{registration.paymentReconciliationRequired ? 'Required' : 'Not required'}</dd><dt>Reason</dt><dd>{readableStatus(registration.payment?.reconciliationReason)}</dd><dt>Payment completed</dt><dd>{formatDate(registration.paymentCompletedAt)}</dd></dl></div>
       <div className="detail-section"><h3>Reservation timeline</h3><dl><dt>Created</dt><dd>{formatDate(registration.createdAt)}</dd><dt>Reservation expiry</dt><dd>{formatDate(registration.seatReservationExpiresAt)}</dd><dt>Capacity released</dt><dd>{registration.capacityReleased ? 'Yes' : 'No'}</dd><dt>Confirmed</dt><dd>{formatDate(registration.confirmedAt)}</dd><dt>Expired</dt><dd>{formatDate(registration.expiredAt)}</dd></dl></div>
+      <div className="detail-section"><h3>Attendance</h3><dl><dt>Event check-in</dt><dd>{formatDate(registration.attendance?.event?.checkedInAt)}</dd><dt>Event staff</dt><dd>{registration.attendance?.event?.checkedInByName || registration.attendance?.event?.checkedInBy || '—'}</dd><dt>Workshop check-in</dt><dd>{formatDate(registration.attendance?.workshop?.checkedInAt)}</dd><dt>Workshop</dt><dd>{workshopLabels[registration.attendance?.workshop?.workshopId] || '—'}</dd><dt>Workshop staff</dt><dd>{registration.attendance?.workshop?.checkedInByName || registration.attendance?.workshop?.checkedInBy || '—'}</dd></dl></div>
     </>}
   </aside></div>;
 }
@@ -198,7 +204,7 @@ export default function AdminPage() {
   const [profile, setProfile] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [registrations, setRegistrations] = useState([]);
-  const [view, setView] = useState('overview');
+  const [view, setView] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/admin/check-in' ? 'checkin' : 'overview');
   const [state, setState] = useState('authenticating');
   const [message, setMessage] = useState('');
   const [detail, setDetail] = useState(null);
@@ -250,6 +256,11 @@ export default function AdminPage() {
     } catch (error) { setMessage(`Export failed: ${error.message}`); }
     finally { setExporting(false); }
   };
+  const selectView = (nextView) => {
+    setView(nextView);
+    const path = nextView === 'checkin' ? '/admin/check-in' : '/admin';
+    if (window.location.pathname !== path) window.history.pushState(window.history.state, '', path);
+  };
 
   if (state === 'configuration-error') return <main className="admin-center-state"><h1>Admin configuration required</h1><p>{message}</p></main>;
   if (state === 'authenticating' || user === undefined) return <main className="admin-center-state"><div className="admin-spinner" /><p>Authenticating staff session…</p></main>;
@@ -260,13 +271,14 @@ export default function AdminPage() {
 
   return <div className="admin-app">
     <header className="admin-header"><div><p className="admin-kicker">VYORA '26 // OPERATIONS</p><h1>Staff Dashboard</h1></div><div className="admin-identity"><span>{profile.name}<small>{profile.role} · {profile.email}</small></span><button className="secondary-button" onClick={refresh}>Refresh</button><button onClick={() => logoutAdmin(auth)}>Logout</button></div></header>
-    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation']].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => setView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
+    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in']].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
     {message && <div className="admin-page-message" role="alert">{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}>×</button></div>}
     <main className="admin-content">
       {view === 'overview' && <Overview dashboard={dashboard} />}
       {view === 'registrations' && <RegistrationsView registrations={registrations} onOpen={openDetail} />}
       {view === 'workshops' && <WorkshopView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'accommodation' && <AccommodationView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
+      {view === 'checkin' && <CheckInView auth={auth} />}
     </main>
     {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} />}
   </div>;

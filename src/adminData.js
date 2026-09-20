@@ -11,6 +11,7 @@ export const hostelLabels = Object.freeze({
 export const defaultFilters = Object.freeze({
   registrationStatus: '', paymentStatus: '', year: '', ieee: '', workshopId: '',
   hosteller: '', hostel: '', stay: '', stayType: '', reconciliation: '',
+  eventCheckin: '', workshopCheckin: '',
 });
 
 export function readableStatus(value) {
@@ -40,6 +41,8 @@ export function filterRegistrations(registrations, search, filters) {
     if (filters.stay && String(item.needsStay) !== filters.stay) return false;
     if (filters.stayType && item.stayType !== filters.stayType) return false;
     if (filters.reconciliation && String(item.paymentReconciliationRequired) !== filters.reconciliation) return false;
+    if (filters.eventCheckin && String(Boolean(item.attendance?.event)) !== filters.eventCheckin) return false;
+    if (filters.workshopCheckin && String(Boolean(item.attendance?.workshop)) !== filters.workshopCheckin) return false;
     return true;
   });
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-export function createAdminRouter({ authorizeAdmin, reportingService }) {
+export function createAdminRouter({ authorizeAdmin, reportingService, checkinService }) {
   const router = Router();
   router.use(authorizeAdmin);
 
@@ -44,6 +44,16 @@ export function createAdminRouter({ authorizeAdmin, reportingService }) {
       next(error);
     }
   });
+
+  if (checkinService) {
+    router.post('/check-ins', async (request, response, next) => {
+      try {
+        response.status(200).json({ data: await checkinService.checkIn(request.body, request.admin) });
+      } catch (error) {
+        next(error);
+      }
+    });
+  }
 
   return router;
 }

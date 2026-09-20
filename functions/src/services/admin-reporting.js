@@ -45,7 +45,18 @@ function publicPayment(payment) {
   };
 }
 
-export function publicRegistration(registration, payment = null) {
+function publicCheckin(checkin, adminNames = new Map()) {
+  if (!checkin) return null;
+  return {
+    type: checkin.type,
+    workshopId: checkin.workshopId || null,
+    checkedInAt: iso(checkin.checkedInAt),
+    checkedInBy: checkin.checkedInBy,
+    checkedInByName: adminNames.get(checkin.checkedInBy) || null,
+  };
+}
+
+export function publicRegistration(registration, payment = null, attendance = {}, adminNames = new Map()) {
   return {
     registrationId: registration.registrationId,
     fullName: registration.fullName,
@@ -77,6 +88,10 @@ export function publicRegistration(registration, payment = null) {
     expiredAt: iso(registration.expiredAt),
     cancelledAt: iso(registration.cancelledAt),
     payment: publicPayment(payment),
+    attendance: {
+      event: publicCheckin(attendance.event, adminNames),
+      workshop: publicCheckin(attendance.workshop, adminNames),
+    },
   };
 }
 
@@ -93,7 +108,7 @@ function latestPayments(payments) {
   return byRegistration;
 }
 
-export function buildDashboard({ registrations, payments, capacity, workshops }) {
+export function buildDashboard({ registrations, payments, capacity, workshops, checkins = [] }) {
   const registrationStatus = counters(REGISTRATION_STATES);
   const paymentStatus = counters(PAYMENT_STATES);
   const years = counters(YEAR_VALUES);
@@ -168,6 +183,10 @@ export function buildDashboard({ registrations, payments, capacity, workshops })
       active: workshops[id]?.active !== false,
       ...workshopRecords[id],
     })),
+    attendance: {
+      event: checkins.filter((item) => item.type === 'EVENT').length,
+      workshop: checkins.filter((item) => item.type === 'WORKSHOP').length,
+    },
   };
 }
 
@@ -176,7 +195,7 @@ const CSV_HEADERS = [
   'ieeeMembershipId', 'workshop', 'isHosteller', 'hostel', 'needsStay', 'stayType',
   'baseFee', 'stayFee', 'totalFee', 'paymentStatus', 'registrationStatus',
   'razorpayOrderId', 'razorpayPaymentId', 'paymentReconciliationRequired',
-  'createdAt', 'confirmedAt', 'expiredAt',
+  'createdAt', 'confirmedAt', 'expiredAt', 'eventCheckedInAt', 'workshopCheckedInAt',
 ];
 
 export function registrationsCsv(registrations) {
@@ -190,27 +209,43 @@ export function registrationsCsv(registrations) {
     item.registrationStatus, item.razorpayOrderId, item.razorpayPaymentId,
     item.paymentReconciliationRequired ? 'Required' : 'Not Required',
     item.createdAt, item.confirmedAt, item.expiredAt,
+    item.attendance?.event?.checkedInAt, item.attendance?.workshop?.checkedInAt,
   ]));
 }
 
 export function createAdminReportingService({ db }) {
   async function readRegistrationsAndPayments() {
-    const [registrationSnapshot, paymentSnapshot] = await Promise.all([
+    const [registrationSnapshot, paymentSnapshot, checkinSnapshot, adminSnapshot] = await Promise.all([
       db.collection(COLLECTIONS.registrations).get(),
       db.collection(COLLECTIONS.payments).get(),
+      db.collection(COLLECTIONS.checkins).get(),
+      db.collection(COLLECTIONS.admins).get(),
     ]);
-    const rawRegistrations = registrationSnapshot.docs.map((doc) => doc.data());
+    const rawRegistrations = registrationSnapshot.docs.map((doc) => ({ ...doc.data(), _docId: doc.id }));
     const payments = paymentSnapshot.docs.map((doc) => doc.data());
+    const checkins = checkinSnapshot.docs.map((doc) => doc.data());
+    const adminNames = new Map(adminSnapshot.docs.map((doc) => [doc.id, doc.data().name]));
+    const attendance = new Map();
+    for (const checkin of checkins) {
+      const current = attendance.get(checkin.registrationDocId) || {};
+      current[checkin.type === 'EVENT' ? 'event' : 'workshop'] = checkin;
+      attendance.set(checkin.registrationDocId, current);
+    }
     const paymentMap = latestPayments(payments);
     const registrations = rawRegistrations
-      .map((registration) => publicRegistration(registration, paymentMap.get(registration.registrationId)))
+      .map((registration) => publicRegistration(
+        registration,
+        paymentMap.get(registration.registrationId),
+        attendance.get(registration._docId),
+        adminNames,
+      ))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    return { rawRegistrations, payments, registrations };
+    return { rawRegistrations, payments, checkins, registrations };
   }
 
   return {
     async dashboard() {
-      const [{ rawRegistrations, payments }, capacitySnapshot, workshopSnapshots] = await Promise.all([
+      const [{ rawRegistrations, payments, checkins }, capacitySnapshot, workshopSnapshots] = await Promise.all([
         readRegistrationsAndPayments(),
         db.collection(COLLECTIONS.system).doc(SYSTEM_DOCUMENTS.capacity).get(),
         Promise.all(WORKSHOP_IDS.map((id) => db.collection(COLLECTIONS.workshops).doc(id).get())),
@@ -221,6 +256,7 @@ export function createAdminReportingService({ db }) {
         payments,
         capacity: capacitySnapshot.data(),
         workshops,
+        checkins,
       });
     },
 

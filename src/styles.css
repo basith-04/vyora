@@ -112,6 +112,8 @@ a { color: inherit; }
 .registration-cta span:last-child { margin-left: auto; font-size: 1.35em; font-weight: 500; }
 .registration-cta:hover { background: #ff794c; transform: translate(-2px,-2px); box-shadow: 4px 4px 0 #08202d; }
 .registration-cta:active { transform: translate(1px,1px); box-shadow: none; }
+.registration-cta.is-closed { cursor: not-allowed; background: #c9b9a4; color: #203441; box-shadow: inset 0 0 0 1px #e7dac8, 2px 2px 0 #08202d; }
+.registration-cta.is-closed:hover, .registration-cta.is-closed:active { transform: none; background: #c9b9a4; box-shadow: inset 0 0 0 1px #e7dac8, 2px 2px 0 #08202d; }
 .registration-status { position: relative; display: flex; align-items: center; height: 97px; margin-top: 13px; border: 1px solid #94c6c4; background: rgba(4,27,40,.96); box-shadow: inset 0 0 0 2px #082e3d, 2px 2px 0 rgba(1,16,27,.8); }
 .registration-status::before, .registration-status::after { content: ''; position: absolute; width: 5px; height: 5px; background: var(--vyora-orange); }
 .registration-status::before { left: -2px; top: -2px; }
@@ -120,6 +122,7 @@ a { color: inherit; }
 .registration-status-copy { display: flex; flex-direction: column; gap: 5px; margin-left: 109px; color: #f2efec; font-size: clamp(13px, 1.25vw, 20px); line-height: 1.25; white-space: nowrap; }
 .registration-status-copy span::before { content: '›'; padding-right: 16px; color: #ffa12d; font-size: 1.55em; vertical-align: -.07em; }
 .registration-status-copy .status-open { color: var(--vyora-green); }
+.registration-status-copy .status-closed { color: #ff9365; }
 .handwritten-note { position: absolute; z-index: var(--layer-content); left: 5.5%; bottom: 6.1%; margin: 0; color: #fff1de; font: 500 clamp(27px, 2.85vw, 48px)/.85 var(--font-hand); transform: rotate(-9deg); text-shadow: 1px 1px 0 #10232e; }
 .handwritten-note span { display: inline-block; margin-left: 22px; border-bottom: 3px solid var(--vyora-orange); padding-bottom: 7px; }
 .location-plaque { position: absolute; z-index: var(--layer-content); right: 3.25%; bottom: 9.8%; display: flex; flex-direction: column; width: 12.2%; min-width: 172px; padding: 17px 21px 13px; transform: rotate(-1.5deg); border: 3px solid #8e8174; background: rgba(174,165,160,.94); color: #1d2934; box-shadow: 5px 5px 0 rgba(10,26,37,.55), inset 0 0 0 2px rgba(236,220,196,.55); font-size: clamp(15px, 1.4vw, 23px); line-height: 1.2; text-shadow: none; }

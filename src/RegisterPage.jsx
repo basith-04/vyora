@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import landscape from '../assets/egister-vjec-landscape-strip.png';
 import adventurer from '../assets/vyora-adventurer-standing.png';
 import { registrationOptions } from './registrationOptions.js';
+import { REGISTRATION_CLOSED_LABEL } from './registrationAvailability.js';
 import './register.css';
 
 const tiers = [
@@ -43,7 +44,7 @@ function RegistrationTier({ tier, selected, onSelect }) {
 }
 
 const facts = [
-  { label: 'REGISTRATION', value: 'LIMITED SLOTS', Icon: PeopleIcon },
+  { label: 'REGISTRATION', value: 'CLOSED', Icon: PeopleIcon },
   { label: 'DATE', value: '09–10 OCT 2026', Icon: CalendarIcon },
   { label: 'VENUE', value: 'VJEC, KANNUR', Icon: PinIcon },
 ];
@@ -54,7 +55,7 @@ function EventFacts() {
 
 export default function RegisterPage() {
   const [selectedTier, setSelectedTier] = useState('ieee');
-  const ctaContent = <>INITIALIZE REGISTRATION <span aria-hidden="true">→</span></>;
+  const ctaContent = <>{REGISTRATION_CLOSED_LABEL} <span aria-hidden="true">■</span></>;
 
   return <section className="register-page site-section" id="register" aria-labelledby="register-heading">
     <img className="register-landscape" src={landscape} alt="Pixel-art mountains, forests, and Vimal Jyothi Engineering College" loading="lazy" decoding="async" />
@@ -66,7 +67,7 @@ export default function RegisterPage() {
     <aside className="register-annotation">SAME MINDS.<br />MORE POSSIBILITIES.<br />A BRIGHTER TOMORROW.</aside>
     <p className="register-side-note" aria-hidden="true">IDEAS<br />PEOPLE<br />PLACES<br />A BRIGHTER<br />TOMORROW</p>
     <div className="register-content"><section className="register-tiers" aria-label="Registration tiers">{tiers.map((tier) => <RegistrationTier key={tier.id} tier={tier} selected={selectedTier === tier.id} onSelect={() => setSelectedTier(tier.id)} />)}</section><EventFacts /></div>
-    <div className="register-action"><a className="register-action-button" href="/registration">{ctaContent}</a></div>
+    <div className="register-action"><span className="register-action-button is-closed" aria-disabled="true">{ctaContent}</span></div>
     <img className="register-adventurer" src={adventurer} alt="VYORA adventurer standing at the VJEC destination" loading="lazy" decoding="async" />
     <div className="register-dialogue">SAME PATHS.<br />BRIGHTER TOMORROWS.<span aria-hidden="true">›</span></div>
     <p className="register-footer-meta">VYORA '26<br />VJEC, KANNUR</p>

@@ -12,7 +12,7 @@ const days = [
     entries: [
       { start: '5:00 PM', end: '5:30 PM', title: 'ARRIVAL', detail: 'Registration' },
       { start: '6:00 PM', end: '6:30 PM', title: 'SYSTEM START', detail: 'Inauguration' },
-      { start: '6:30 PM', end: '7:00 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Former IEEE Kerala Section Chairperson'] },
+      { start: '6:30 PM', end: '7:30 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Former IEEE Kerala Section Chairperson'] },
       { start: '7:30 PM', end: '8:00 PM', title: 'REFUEL', detail: 'Dinner' },
       { start: '8:30 PM', end: '9:30 PM', title: 'NIGHT MODE', detail: 'Ice Breaking · IEEE WIE', notes: ['Musical Night'], terminal: true },
     ],

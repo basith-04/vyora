@@ -118,6 +118,10 @@
 .registration-terminal { width: min(100%,760px); min-height: 380px; margin: 30px auto; padding: 25px 18px; border: 1px solid #65a0a5; background: var(--vyora-navy); color: var(--vyora-cream); box-shadow: inset 0 0 0 3px #123c4b; }
 .registration-terminal > span { color: var(--vyora-green); font: 600 11px var(--font-technical); }
 .registration-terminal h1 { margin: 22px 0; font: clamp(26px,6.7vw,50px)/1.13 var(--font-display); }
+.registration-closed-container { display: grid; min-height: calc(100svh - 100px); place-items: center; }
+.registration-closed-message { min-height: 0; margin: 0 auto; }
+.registration-closed-mark { display: grid; place-items: center; width: 50px; height: 50px; margin-top: 26px; border: 2px solid var(--vyora-orange); color: var(--vyora-orange); font: 700 34px/1 var(--font-technical); }
+.registration-closed-message h1 { max-width: 16ch; color: #ffd383; }
 .registration-loading-track { height: 23px; padding: 3px; border: 1px solid #77adb0; }
 .registration-loading-track span { display: block; height: 100%; background: repeating-linear-gradient(90deg,var(--vyora-green) 0 12px,var(--vyora-navy) 12px 15px); transition: width .2s steps(8,end); }
 .registration-initializing > strong { display: block; margin-top: 9px; color: var(--vyora-green); font: 700 16px var(--font-technical); text-align: right; }

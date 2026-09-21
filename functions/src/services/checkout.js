@@ -170,10 +170,16 @@ export function createCheckoutService({
     });
   }
 
-  async function ensureOrder(ref, recoveryTokenHash) {
+  async function ensureOrder(ref, recoveryTokenHash, { requireOpen = false } = {}) {
     const claim = await db.runTransaction(async (transaction) => {
-      const [snapshot, configSnapshot] = await transaction.getAll(ref, registrationConfigRef);
-      requireRegistrationOpen(configSnapshot);
+      let snapshot;
+      if (requireOpen) {
+        const [registrationSnapshot, configSnapshot] = await transaction.getAll(ref, registrationConfigRef);
+        snapshot = registrationSnapshot;
+        requireRegistrationOpen(configSnapshot);
+      } else {
+        snapshot = await transaction.get(ref);
+      }
       if (!snapshot.exists) throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
       const registration = snapshot.data();
       if (!registrationHasRecoveryToken(registration, recoveryTokenHash)) {
@@ -233,9 +239,9 @@ export function createCheckoutService({
         throw new AppError('PAYMENT_ORDER_IN_PROGRESS', 'The payment order is still being prepared.', 409);
       }
       if (!order) {
-        // The registration transaction and the external Razorpay request cannot be atomic.
-        // Re-read the switch at the last possible point before creating the order.
-        await assertRegistrationOpen();
+        // A new-registration transaction and the external Razorpay request cannot be atomic.
+        // Re-read the switch at the last possible point for that public creation path.
+        if (requireOpen) await assertRegistrationOpen();
         order = await razorpay.createOrder({
           amount: claim.amount,
           currency: CURRENCY,
@@ -271,8 +277,8 @@ export function createCheckoutService({
         throw new AppError('PAYMENT_ORDER_FAILED', 'The payment order could not be created. Your seat remains reserved until the displayed expiry time.', 502);
       }
     }
-    // Do not associate or expose an order if registration closed while Razorpay was responding.
-    await assertRegistrationOpen();
+    // For a new submission, do not expose an order if registration closed while Razorpay was responding.
+    if (requireOpen) await assertRegistrationOpen();
     const associated = await associateOrder(ref, expected, order);
     if (
       associated.registrationStatus !== REGISTRATION_STATUS.paymentPending
@@ -343,7 +349,7 @@ export function createCheckoutService({
         throw new AppError('PAYMENT_REQUIRES_RECONCILIATION', 'The previous payment requires organizer reconciliation.', 409);
       }
     }
-    const registration = await ensureOrder(ref, recoveryTokenHash);
+    const registration = await ensureOrder(ref, recoveryTokenHash, { requireOpen: true });
     return participantResponse(registration, razorpay.getPublicKeyId());
   }
 
@@ -364,7 +370,6 @@ export function createCheckoutService({
       const refreshed = await result.ref.get();
       result.data = refreshed.data();
     }
-    await assertRegistrationOpen();
     const { data } = result;
     return participantResponse(data, razorpay.getPublicKeyId());
   }

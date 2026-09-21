@@ -229,20 +229,16 @@ test('new registration is rejected while registration is closed before order cre
   assert.equal((await db.collection('registrations').get()).size, 0);
 });
 
-test('existing pending registration cannot retry, resume, or expose Checkout while closed', async () => {
+test('existing pending registration can retry and inspect status while new registration remains closed', async () => {
   const gateway = fakeGateway({ orderOverrides: { status: 'created' } });
   const { result } = await createReadyRegistration(gateway);
   await db.doc('system/registration-config').update({ registrationOpen: false });
   const checkout = checkoutWithPaymentRecovery(gateway, () => creationTime + 1_000);
 
-  await assert.rejects(
-    checkout.retry(result.registrationId, recoveryTokenHash),
-    (error) => error.code === 'REGISTRATION_CLOSED',
-  );
-  await assert.rejects(
-    checkout.status(result.registrationId, recoveryTokenHash),
-    (error) => error.code === 'REGISTRATION_CLOSED',
-  );
+  const retried = await checkout.retry(result.registrationId, recoveryTokenHash);
+  const status = await checkout.status(result.registrationId, recoveryTokenHash);
+  assert.equal(retried.checkout.orderId, result.checkout.orderId);
+  assert.equal(status.checkout.orderId, result.checkout.orderId);
   await assert.rejects(
     checkout.start(valid, 'b'.repeat(64)),
     (error) => error.code === 'REGISTRATION_CLOSED',
@@ -250,7 +246,7 @@ test('existing pending registration cannot retry, resume, or expose Checkout whi
   assert.equal(gateway.createCalls, 1);
 });
 
-test('order creation re-checks registrationOpen immediately before calling Razorpay', async () => {
+test('new-registration order creation re-checks registrationOpen immediately before calling Razorpay', async () => {
   const createRegistration = createRegistrationService({ db, clock: () => creationTime });
   const pending = await createRegistration(valid, { recoveryTokenHash });
   const registrationRef = db.doc(`registrations/${pending.registrationDocId}`);
@@ -278,7 +274,7 @@ test('order creation re-checks registrationOpen immediately before calling Razor
   });
 
   await assert.rejects(
-    checkout.retry(pending.registrationId, recoveryTokenHash),
+    checkout.start(valid, recoveryTokenHash),
     (error) => error.code === 'REGISTRATION_CLOSED',
   );
   assert.equal(createCalls, 0);

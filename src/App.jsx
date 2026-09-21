@@ -8,10 +8,11 @@ import TracksPage from './TracksPage.jsx';
 import FieldPage from './FieldPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import PeoplePage from './PeoplePage.jsx';
-import RegistrationPage from './RegistrationPage.jsx';
+import RegistrationClosedPage from './RegistrationClosedPage.jsx';
 import AdminPage from './AdminPage.jsx';
 import { Footer, PolicyPage, informationPaths } from './InformationPages.jsx';
 import { publicSections } from './siteNavigation.js';
+import { REGISTRATION_CLOSED_LABEL } from './registrationAvailability.js';
 
 const sectionIds = new Set(publicSections.map(({ id }) => id));
 
@@ -187,11 +188,11 @@ function JourneyList() {
 
 function RegistrationStatus() {
   return (
-    <div className="registration-status" aria-label="Registration open, limited slots">
+    <div className="registration-status" aria-label="Registrations closed">
       <img src={standingAdventurer} alt="VYORA adventurer" />
       <div className="registration-status-copy">
-        <span className="status-open">REGISTRATION OPEN</span>
-        <span>LIMITED SLOTS</span>
+        <span className="status-closed">{REGISTRATION_CLOSED_LABEL}</span>
+        <span>09 — 10 OCT 2026</span>
       </div>
     </div>
   );
@@ -222,7 +223,7 @@ function HomeHero() {
       <h1 className="hero-title" id="home-heading"><span>VYORA</span><span className="year">'26</span></h1>
       <JourneyList />
       <div className="registration-group">
-        <a className="registration-cta" href="/registration"><span aria-hidden="true">›</span> INITIALIZE REGISTRATION <span aria-hidden="true">→</span></a>
+        <span className="registration-cta is-closed" aria-disabled="true"><span aria-hidden="true">×</span> {REGISTRATION_CLOSED_LABEL} <span aria-hidden="true">■</span></span>
         <RegistrationStatus />
       </div>
       <p className="handwritten-note">Same Minds.<br /><span>Higher Ground.</span></p>
@@ -263,7 +264,7 @@ export default function App() {
       <div className={`app-shell${isRegistration ? '' : ' public-app-shell'}`}>
         <WindowChrome />
         <Navbar activeSection={activeSection} isRegistration={isRegistration} isStandalone={isStandalone} onSectionNavigate={onSectionNavigate} />
-        {isRegistration ? <RegistrationPage /> : isTicket ? <TicketPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
+        {isRegistration ? <RegistrationClosedPage /> : isTicket ? <TicketPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
           <HomeHero />
           <ChapterBoundary />
           <ProgramPage />

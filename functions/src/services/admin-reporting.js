@@ -291,6 +291,19 @@ export function registrationsCsv(registrations) {
   ]));
 }
 
+export function buildTicketsReport(tickets, registrations) {
+  const byDocument = new Map(registrations.map((registration) => [registration._docId, registration]));
+  const confirmed = tickets.flatMap((ticket) => {
+    const registration = byDocument.get(ticket.registrationDocId);
+    if (!registration || ticket.active !== true
+      || registration.registrationStatus !== 'CONFIRMED' || registration.paymentStatus !== 'PAID'
+      || registration.ticketIssued !== true || registration.ticketId !== ticket.ticketId
+      || registration.registrationId !== ticket.registrationId) return [];
+    return [{ ticketId: ticket.ticketId, fullName: registration.fullName, year: registration.year }];
+  });
+  return { total: confirmed.length, tickets: confirmed };
+}
+
 export function createAdminReportingService({ db }) {
   async function readRegistrationsAndPayments() {
     const [registrationSnapshot, paymentSnapshot, checkinSnapshot, adminSnapshot] = await Promise.all([
@@ -322,6 +335,15 @@ export function createAdminReportingService({ db }) {
   }
 
   return {
+    async tickets() {
+      const [ticketSnapshot, registrationSnapshot] = await Promise.all([
+        db.collection(COLLECTIONS.tickets).get(), db.collection(COLLECTIONS.registrations).get(),
+      ]);
+      return buildTicketsReport(
+        ticketSnapshot.docs.map((doc) => ({ ...doc.data(), registrationDocId: doc.id })),
+        registrationSnapshot.docs.map((doc) => ({ ...doc.data(), _docId: doc.id })),
+      );
+    },
     async dashboard() {
       const [{ rawRegistrations, payments, checkins }, capacitySnapshot, workshopSnapshots] = await Promise.all([
         readRegistrationsAndPayments(),

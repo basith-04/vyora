@@ -21,6 +21,14 @@ export function createAdminRouter({
     }
   });
 
+  router.get('/tickets', requireAdminRole, async (request, response, next) => {
+    try {
+      response.json({ data: await reportingService.tickets() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/registrations', async (request, response, next) => {
     try {
       response.json({ data: { registrations: await reportingService.registrations() } });

@@ -45,6 +45,7 @@ export async function adminRequest(auth, path, options = {}) {
 
 export const loadAdminProfile = (auth) => adminRequest(auth, '/api/admin/me');
 export const loadDashboard = (auth) => adminRequest(auth, '/api/admin/dashboard');
+export const loadTickets = (auth) => adminRequest(auth, '/api/admin/tickets');
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export function downloadRegistrationsCsv(auth, search = '', filters = {}) {

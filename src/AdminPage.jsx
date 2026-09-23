@@ -3,7 +3,7 @@ import { getAdminAuth } from './firebaseClient.js';
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 import {
   downloadRegistrationsCsv, loadAdminProfile, loadDashboard, loadRegistration,
-  loadRegistrations, reconcilePayment, retryConfirmationEmail,
+  loadRegistrations, loadTickets, reconcilePayment, retryConfirmationEmail,
 } from './adminApi.js';
 import {
   defaultFilters, filterRegistrations, formatDate, hostelLabels, readableStatus,
@@ -52,6 +52,29 @@ function Login({ auth, notice }) {
 
 function Metric({ label, value, tone = '' }) {
   return <article className={`admin-metric ${tone}`}><span>{label}</span><strong>{value ?? 0}</strong></article>;
+}
+
+function TicketsView({ auth }) {
+  const [report, setReport] = useState(null);
+  const [year, setYear] = useState('all');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    loadTickets(auth).then((data) => { if (active) setReport(data); })
+      .catch((failure) => { if (active) setError(failure.message); });
+    return () => { active = false; };
+  }, [auth]);
+  if (error) return <div className="admin-panel" role="alert">{error}</div>;
+  if (!report) return <div className="admin-panel">Loading tickets…</div>;
+  const tickets = year === 'all' ? report.tickets : report.tickets.filter((item) => item.year === Number(year));
+  return <div className="admin-stack">
+    <section className="admin-panel"><div className="metric-grid"><Metric label="Total confirmed tickets" value={report.total} tone="good" /></div></section>
+    <section className="admin-panel">
+      <div className="ticket-years" aria-label="Filter tickets by year">{['all', '1', '2', '3', '4'].map((value) => <button key={value} type="button" aria-pressed={year === value} className={year === value ? 'active' : ''} onClick={() => setYear(value)}>{value === 'all' ? 'ALL' : `YEAR ${value}`}</button>)}</div>
+      <div className="panel-heading"><h2>Tickets</h2><span>Showing: {tickets.length} tickets</span></div>
+      {tickets.length ? <div className="ticket-list">{tickets.map((ticket) => <div className="ticket-row" key={ticket.ticketId}><strong>{ticket.ticketId}</strong><span>{ticket.fullName}</span></div>)}</div> : <div className="admin-empty">No confirmed tickets for this year.</div>}
+    </section>
+  </div>;
 }
 
 function CapacityBar({ label, occupied, capacity }) {
@@ -286,7 +309,10 @@ export default function AdminPage() {
   const [profile, setProfile] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [registrations, setRegistrations] = useState([]);
-  const [view, setView] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/admin/check-in' ? 'checkin' : 'overview');
+  const [view, setView] = useState(() => {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    return path === '/admin/check-in' ? 'checkin' : path === '/admin/tickets' ? 'tickets' : 'overview';
+  });
   const [state, setState] = useState('authenticating');
   const [message, setMessage] = useState('');
   const [detail, setDetail] = useState(null);
@@ -343,7 +369,7 @@ export default function AdminPage() {
   };
   const selectView = (nextView) => {
     setView(nextView);
-    const path = nextView === 'checkin' ? '/admin/check-in' : '/admin';
+    const path = nextView === 'checkin' ? '/admin/check-in' : nextView === 'tickets' ? '/admin/tickets' : '/admin';
     if (window.location.pathname !== path) window.history.pushState(window.history.state, '', path);
   };
   const retryEmail = async (registrationId) => {
@@ -372,10 +398,11 @@ export default function AdminPage() {
   if (state === 'unauthorized') return <main className="admin-center-state"><h1>Access not authorized</h1><p>Your Firebase account is valid, but it is not an active VYORA admin or coordinator.</p><button onClick={() => logoutAdmin(auth)}>Sign out</button></main>;
   if (state === 'loading') return <main className="admin-center-state"><div className="admin-spinner" /><p>Loading protected event data…</p></main>;
   if (state === 'error') return <main className="admin-center-state"><h1>Dashboard unavailable</h1><p>{message}</p><div><button onClick={refresh}>Retry</button> <button onClick={() => logoutAdmin(auth)}>Sign out</button></div></main>;
+  if (view === 'tickets' && profile.role !== 'ADMIN') return <main className="admin-center-state"><h1>Access not authorized</h1><p>Administrator access is required.</p><button onClick={() => selectView('overview')}>Back to dashboard</button></main>;
 
   return <div className="admin-app">
     <header className="admin-header"><div><p className="admin-kicker">VYORA '26 // OPERATIONS</p><h1>Staff Dashboard</h1></div><div className="admin-identity"><span>{profile.name}<small>{profile.role} · {profile.email}</small></span><button className="secondary-button" onClick={refresh}>Refresh</button><button onClick={() => logoutAdmin(auth)}>Logout</button></div></header>
-    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
+    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['tickets', 'Tickets'], ['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
     {message && <div className="admin-page-message" role="alert">{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}>×</button></div>}
     <main className="admin-content">
       {view === 'overview' && <Overview dashboard={dashboard} canReconcilePayment={profile.role === 'ADMIN'} onReconcilePayment={() => selectView('reconciliation')} />}
@@ -383,6 +410,7 @@ export default function AdminPage() {
       {view === 'workshops' && <WorkshopView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'accommodation' && <AccommodationView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'checkin' && <CheckInView auth={auth} />}
+      {view === 'tickets' && profile.role === 'ADMIN' && <TicketsView auth={auth} />}
       {view === 'reconciliation' && profile.role === 'ADMIN' && <ManualPaymentReconciliation auth={auth} dashboard={dashboard} onChanged={refreshReportingData} />}
     </main>
     {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} onRetryEmail={retryEmail} emailRetrying={emailRetrying} />}

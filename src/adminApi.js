@@ -46,6 +46,10 @@ export async function adminRequest(auth, path, options = {}) {
 export const loadAdminProfile = (auth) => adminRequest(auth, '/api/admin/me');
 export const loadDashboard = (auth) => adminRequest(auth, '/api/admin/dashboard');
 export const loadTickets = (auth) => adminRequest(auth, '/api/admin/tickets');
+export const loadTicketEdit = (auth, id) => adminRequest(auth, `/api/admin/edit-ticket/${encodeURIComponent(id)}`);
+export const saveTicketEdit = (auth, id, input) => adminRequest(auth, `/api/admin/edit-ticket/${encodeURIComponent(id)}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+});
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export function downloadRegistrationsCsv(auth, search = '', filters = {}) {

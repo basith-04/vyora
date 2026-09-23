@@ -240,7 +240,7 @@ export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
   const isTicket = activePath === '/ticket';
-  const isAdmin = activePath === '/admin' || activePath === '/admin/check-in' || activePath === '/admin/tickets';
+  const isAdmin = activePath === '/admin' || activePath === '/admin/check-in' || activePath === '/admin/tickets' || activePath === '/admin/edit-ticket';
   const isPolicy = informationPaths.has(activePath);
   const isStandalone = isRegistration || isTicket || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);

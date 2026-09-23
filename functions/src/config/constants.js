@@ -7,6 +7,7 @@ export const COLLECTIONS = Object.freeze({
   admins: 'admins',
   tickets: 'tickets',
   checkins: 'checkins',
+  auditLogs: 'auditLogs',
 });
 
 export const SYSTEM_DOCUMENTS = Object.freeze({

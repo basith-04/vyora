@@ -5,7 +5,7 @@ import request from 'supertest';
 import { createAdminAuthorization } from '../../src/middleware/admin-auth.js';
 import { createAdminRouter } from '../../src/routes/admin.js';
 import {
-  buildDashboard, filterRegistrationsForExport, publicRegistration, registrationsCsv,
+  buildDashboard, buildTicketsReport, filterRegistrationsForExport, publicRegistration, registrationsCsv,
 } from '../../src/services/admin-reporting.js';
 
 function fakeDb(profile) {
@@ -20,6 +20,7 @@ function protectedApp({ tokenResult = { uid: 'staff-1', email: 'staff@example.co
   const reportingService = {
     dashboard: async () => ({ ok: true }), registrations: async () => [],
     registration: async () => ({ registrationId: 'VYR26-1' }), csv: async () => '"registrationId"',
+    tickets: async () => ({ total: 0, tickets: [] }),
   };
   const app = express();
   app.use('/api/admin', createAdminRouter({
@@ -46,6 +47,43 @@ for (const role of ['ADMIN', 'COORDINATOR']) {
     assert.equal((await request(app).get('/api/admin/dashboard').set('Authorization', 'Bearer valid')).status, 200);
   });
 }
+
+test('Tickets API allows ADMIN and rejects COORDINATOR', async () => {
+  for (const [role, expected] of [['ADMIN', 200], ['COORDINATOR', 403]]) {
+    const app = protectedApp({ profile: { role, active: true } });
+    const response = await request(app).get('/api/admin/tickets').set('Authorization', 'Bearer valid');
+    assert.equal(response.status, expected);
+    if (role === 'COORDINATOR') assert.equal(response.body.error.code, 'FORBIDDEN');
+  }
+  assert.equal((await request(protectedApp()).get('/api/admin/tickets')).status, 401);
+});
+
+test('Tickets report counts only active tickets with matching confirmed paid registrations', () => {
+  const registrations = [
+    { _docId: 'a', registrationId: 'VYR26-A', fullName: 'Alice', year: 1, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ticketIssued: true, ticketId: 'TKT-A' },
+    { _docId: 'b', registrationId: 'VYR26-B', fullName: 'Bob', year: 4, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ticketIssued: true, ticketId: 'TKT-B' },
+    { _docId: 'c', registrationId: 'VYR26-C', fullName: 'Expired', year: 2, registrationStatus: 'EXPIRED', paymentStatus: 'PAID', ticketIssued: true, ticketId: 'TKT-C' },
+    { _docId: 'd', registrationId: 'VYR26-D', fullName: 'Unpaid', year: 3, registrationStatus: 'CONFIRMED', paymentStatus: 'PENDING', ticketIssued: true, ticketId: 'TKT-D' },
+  ];
+  const tickets = [
+    { registrationDocId: 'a', registrationId: 'VYR26-A', ticketId: 'TKT-A', active: true },
+    { registrationDocId: 'b', registrationId: 'VYR26-B', ticketId: 'TKT-B', active: true },
+    { registrationDocId: 'c', registrationId: 'VYR26-C', ticketId: 'TKT-C', active: true },
+    { registrationDocId: 'd', registrationId: 'VYR26-D', ticketId: 'TKT-D', active: true },
+    { registrationDocId: 'missing', registrationId: 'VYR26-X', ticketId: 'TKT-X', active: true },
+    { registrationDocId: 'a', registrationId: 'VYR26-A', ticketId: 'TKT-A', active: false },
+    { registrationDocId: 'b', registrationId: 'VYR26-B', ticketId: 'TKT-WRONG', active: true },
+  ];
+  const report = buildTicketsReport(tickets, registrations);
+  assert.deepEqual(report, { total: 2, tickets: [
+    { ticketId: 'TKT-A', fullName: 'Alice', year: 1 },
+    { ticketId: 'TKT-B', fullName: 'Bob', year: 4 },
+  ] });
+  assert.equal(report.tickets.filter((item) => item.year === 1).length, 1);
+  assert.equal(report.tickets.filter((item) => item.year === 2).length, 0);
+  assert.equal(report.tickets.filter((item) => item.year === 3).length, 0);
+  assert.equal(report.tickets.filter((item) => item.year === 4).length, 1);
+});
 
 test('dashboard metrics distinguish operational capacity, registration states and payment attempts', () => {
   const registrations = [

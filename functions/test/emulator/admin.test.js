@@ -141,6 +141,24 @@ test('active coordinator can read exact dashboard counters, summaries and reconc
   assert.equal(response.body.data.payments.reconciliationRequired, 1);
 });
 
+test('Tickets API returns only active confirmed paid tickets to ADMIN', async () => {
+  const admin = await createIdentity('tickets-admin@example.com');
+  const coordinator = await createIdentity('tickets-coordinator@example.com');
+  await db.doc(`admins/${admin.user.uid}`).set({ name: 'Admin', role: 'ADMIN', active: true });
+  await db.doc(`admins/${coordinator.user.uid}`).set({ name: 'Coordinator', role: 'COORDINATOR', active: true });
+  await db.doc('registrations/reg-1').update({ ticketIssued: true, ticketId: 'TKT-ONE' });
+  await db.doc('tickets/reg-1').set({ ticketId: 'TKT-ONE', registrationDocId: 'reg-1', registrationId: 'VYR26-ADMIN-1', active: true });
+  await db.doc('registrations/reg-2').update({ ticketIssued: true, ticketId: 'TKT-TWO' });
+  await db.doc('tickets/reg-2').set({ ticketId: 'TKT-TWO', registrationDocId: 'reg-2', registrationId: 'VYR26-ADMIN-2', active: true });
+
+  const denied = await request(app).get('/api/admin/tickets').set('Authorization', `Bearer ${coordinator.token}`);
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.error.code, 'FORBIDDEN');
+  const response = await request(app).get('/api/admin/tickets').set('Authorization', `Bearer ${admin.token}`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.data, { total: 1, tickets: [{ ticketId: 'TKT-ONE', fullName: 'Admin, Test', year: 1 }] });
+});
+
 test('detail is protected, returns safe data and reports unknown registration', async () => {
   const { user, token } = await createIdentity('detail@example.com');
   await db.doc(`admins/${user.uid}`).set({ name: 'Detail Admin', email: user.email, role: 'ADMIN', active: true });

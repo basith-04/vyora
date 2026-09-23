@@ -12,6 +12,7 @@ import { createAdminRouter } from '../../src/routes/admin.js';
 import { DEFAULT_CONFIGURATION } from '../../src/config/constants.js';
 import { createTicketService } from '../../src/services/ticket.js';
 import { createCheckinService } from '../../src/services/checkin.js';
+import { createTicketEditService } from '../../src/services/ticket-edit.js';
 
 const projectId = process.env.GCLOUD_PROJECT || 'demo-vyora-26';
 let adminApp;
@@ -93,6 +94,7 @@ before(async () => {
           outcome: 'CONFIRMED', registrationId, reconciledBy: adminContext.uid,
         }),
       },
+      ticketEditService: createTicketEditService({ db }),
     }),
     logger: { error() {} },
   });
@@ -157,6 +159,73 @@ test('Tickets API returns only active confirmed paid tickets to ADMIN', async ()
   const response = await request(app).get('/api/admin/tickets').set('Authorization', `Bearer ${admin.token}`);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, { total: 1, tickets: [{ ticketId: 'TKT-ONE', fullName: 'Admin, Test', year: 1 }] });
+});
+
+test('Edit Ticket is ADMIN-only, appends manual payment, preserves Razorpay and counters, and is idempotent', async () => {
+  const admin = await createIdentity('edit-admin@example.com');
+  const coordinator = await createIdentity('edit-coordinator@example.com');
+  await db.doc(`admins/${admin.user.uid}`).set({ name: 'Admin', role: 'ADMIN', active: true });
+  await db.doc(`admins/${coordinator.user.uid}`).set({ name: 'Coordinator', role: 'COORDINATOR', active: true });
+  await db.doc('registrations/reg-1').update({ ticketIssued: true, ticketId: 'TKT-EDIT' });
+  await db.doc('tickets/reg-1').set({ ticketId: 'TKT-EDIT', registrationDocId: 'reg-1', registrationId: 'VYR26-ADMIN-1', active: true });
+  const url = '/api/admin/edit-ticket/VYR26-ADMIN-1';
+  assert.equal((await request(app).get(url)).status, 401);
+  assert.equal((await request(app).post(url).send({})).status, 401);
+  assert.equal((await request(app).get(url).set('Authorization', `Bearer ${coordinator.token}`)).status, 403);
+  assert.equal((await request(app).post(url).set('Authorization', `Bearer ${coordinator.token}`).send({})).status, 403);
+  const initial = await request(app).get(url).set('Authorization', `Bearer ${admin.token}`);
+  assert.equal(initial.status, 200);
+  assert.equal(initial.body.data.fullName, 'Admin, Test');
+  assert.equal(initial.body.data.ticketId, 'TKT-EDIT');
+  const body = { requestId: '123e4567-e89b-42d3-a456-426614174000', expectedUpdatedAt: initial.body.data.updatedAt,
+    accommodation: { isHosteller: false, hostel: null, needsStay: true, stayType: 'AC' },
+    manualPayment: { amountPaise: 5000, reason: 'NON_AC to AC upgrade' } };
+  const beforePayment = (await db.doc('payments/pay_admin').get()).data();
+  const beforeCapacity = (await db.doc('system/capacity').get()).data();
+  const beforeWorkshop = (await db.doc('workshops/github-ai').get()).data();
+  const saved = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send(body);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.stayType, 'AC');
+  assert.equal(saved.body.data.manualPayments.length, 1);
+  assert.equal(saved.body.data.manualPayments[0].amountPaise, 5000);
+  assert.equal(saved.body.data.manualPayments[0].recordedBy, admin.user.uid);
+  assert.equal((await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send(body)).status, 200);
+  const stored = (await db.doc('registrations/reg-1').get()).data();
+  assert.equal(stored.manualPayments.length, 1);
+  assert.equal(stored.totalFee, 649);
+  assert.equal(stored.stayFee, 250);
+  assert.equal(stored.razorpayPaymentId, 'pay_admin');
+  assert.deepEqual((await db.doc('payments/pay_admin').get()).data(), beforePayment);
+  assert.deepEqual((await db.doc('system/capacity').get()).data(), beforeCapacity);
+  assert.deepEqual((await db.doc('workshops/github-ai').get()).data(), beforeWorkshop);
+  const audit = (await db.doc('auditLogs/ticket_edit_123e4567-e89b-42d3-a456-426614174000').get()).data();
+  assert.equal(audit.performedBy, admin.user.uid);
+  assert.equal(audit.metadata.previous.stayType, 'NON_AC');
+  assert.equal(audit.metadata.next.stayType, 'AC');
+  assert.equal(audit.metadata.manualPayment.amountPaise, 5000);
+  assert.ok(audit.createdAt);
+  const second = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send({
+    requestId: '123e4567-e89b-42d3-a456-426614174003', expectedUpdatedAt: saved.body.data.updatedAt,
+    manualPayment: { amountPaise: 20000, reason: 'Accommodation adjustment' },
+  });
+  assert.equal(second.status, 200);
+  assert.deepEqual(second.body.data.manualPayments.map((payment) => payment.amountPaise), [5000, 20000]);
+  assert.equal(second.body.data.stayType, 'AC');
+  const badAmount = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send({
+    requestId: '123e4567-e89b-42d3-a456-426614174004', expectedUpdatedAt: second.body.data.updatedAt,
+    manualPayment: { amountPaise: 0, reason: 'Invalid' },
+  });
+  assert.equal(badAmount.status, 400);
+  const invalid = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send({
+    requestId: '123e4567-e89b-42d3-a456-426614174001', expectedUpdatedAt: second.body.data.updatedAt,
+    accommodation: { isHosteller: true, hostel: 'SANJOSE', needsStay: true, stayType: 'AC' },
+  });
+  assert.equal(invalid.status, 400);
+  const arbitrary = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send({
+    requestId: '123e4567-e89b-42d3-a456-426614174002', expectedUpdatedAt: second.body.data.updatedAt,
+    registrationStatus: 'CANCELLED',
+  });
+  assert.equal(arbitrary.status, 400);
 });
 
 test('detail is protected, returns safe data and reports unknown registration', async () => {

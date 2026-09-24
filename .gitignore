@@ -11,3 +11,6 @@ ui-debug.log
 .secret.local
 functions/.secret.local
 .env
+docs/
+.cache
+.env.vyora-a76f9

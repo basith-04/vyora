@@ -19,17 +19,46 @@ const policyPages = {
     sections: [{ heading: 'ORGANIZER', paragraphs: [organizer] }, { heading: 'ADDRESS', paragraphs: address }, { heading: 'EMAIL', paragraphs: [`Write to us at ${email}.`], email: true }],
   },
   '/terms-and-conditions': {
-    title: 'TERMS & CONDITIONS',
-    eyebrow: '// TERMS.EXE',
-    intro: "These terms apply to registrations for VYORA '26, organized by IEEE Student Branch VJEC.",
-    sections: [
-      { heading: 'REGISTRATION', bullets: ['Attendees must provide accurate and complete information while registering for VYORA \'26.', 'Registration is subject to availability and any applicable event capacity limits.', 'Registration is considered confirmed only after successful completion of the required registration and payment process.', 'The registration fees displayed during registration are the applicable fees for the selected registration category and options.'] },
-      { heading: 'ATTENDEE RESPONSIBILITIES', bullets: ['Attendees are responsible for ensuring that the information submitted during registration is correct.', 'Attendees must follow the event rules and instructions communicated by IEEE Student Branch VJEC.'] },
-      { heading: 'EVENT CHANGES', paragraphs: ['Event schedules, sessions, workshops, speakers, and other arrangements may be changed when reasonably necessary.'] },
-      { heading: 'RELATED POLICIES', paragraphs: ['Cancellations and refunds are governed by the separate Cancellation and Refund Policy. Personal information is handled according to the Privacy Policy.'] },
-      { heading: 'QUERIES', paragraphs: [`Questions may be sent to ${email}.`], email: true },
-    ],
-  },
+  title: 'TERMS & CONDITIONS',
+  eyebrow: '// TERMS.EXE',
+  intro: "These terms apply to registrations for VYORA '26, organized by IEEE Student Branch VJEC.",
+  sections: [
+    {
+      heading: 'REGISTRATION',
+      bullets: [
+        "Attendees must provide accurate and complete information while registering for VYORA '26.",
+        'Registration is subject to availability and any applicable event capacity limits.',
+        'Registration is considered confirmed only after successful completion of the required registration and payment process.',
+        'The registration fees displayed during registration are the applicable fees for the selected registration category and options.'
+      ]
+    },
+    {
+      heading: 'ATTENDEE RESPONSIBILITIES',
+      bullets: [
+        'Attendees are responsible for ensuring that the information submitted during registration is correct.',
+        'Participants registering under the IEEE Member category must provide a valid IEEE Membership ID. If the membership details are found to be invalid or false, the participant will be required to pay the ₹400 registration fee difference along with an additional ₹150 penalty to participate in the event.',
+        'Attendees must follow the event rules and instructions communicated by IEEE Student Branch VJEC.'
+      ]
+    },
+    {
+      heading: 'EVENT CHANGES',
+      paragraphs: [
+        'Event schedules, sessions, workshops, speakers, and other arrangements may be changed when reasonably necessary.'
+      ]
+    },
+    {
+      heading: 'RELATED POLICIES',
+      paragraphs: [
+        'Cancellations and refunds are governed by the separate Cancellation and Refund Policy. Personal information is handled according to the Privacy Policy.'
+      ]
+    },
+    {
+      heading: 'QUERIES',
+      paragraphs: [`Questions may be sent to ${email}.`],
+      email: true
+    },
+  ],
+},
   '/privacy-policy': {
     title: 'PRIVACY POLICY',
     eyebrow: '// PRIVACY.EXE',

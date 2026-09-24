@@ -58,6 +58,30 @@ test('Tickets API allows ADMIN and rejects COORDINATOR', async () => {
   assert.equal((await request(protectedApp()).get('/api/admin/tickets')).status, 401);
 });
 
+test('Manual Ticket API requires an active ADMIN', async () => {
+  let calls = 0;
+  const makeApp = (profile) => {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/admin', createAdminRouter({
+      authorizeAdmin: createAdminAuthorization({
+        auth: { verifyIdToken: async () => ({ uid: 'staff-1' }) }, db: fakeDb(profile),
+      }),
+      reportingService: {},
+      manualTicketService: { create: async () => { calls += 1; return { ticketId: 'TKT-1' }; } },
+    }));
+    app.use((error, req, res, next) => res.status(error.status || 500).json({ error: { code: error.code } }));
+    return app;
+  };
+  assert.equal((await request(makeApp(null)).post('/api/admin/manual-tickets').send({})).status, 401);
+  assert.equal((await request(makeApp({ role: 'COORDINATOR', active: true })).post('/api/admin/manual-tickets').set('Authorization', 'Bearer valid').send({})).status, 403);
+  assert.equal(calls, 0);
+  const result = await request(makeApp({ role: 'ADMIN', active: true })).post('/api/admin/manual-tickets').set('Authorization', 'Bearer valid').send({});
+  assert.equal(result.status, 201);
+  assert.equal(result.body.data.ticketId, 'TKT-1');
+  assert.equal(calls, 1);
+});
+
 test('Tickets report counts only active tickets with matching confirmed paid registrations', () => {
   const registrations = [
     { _docId: 'a', registrationId: 'VYR26-A', fullName: 'Alice', year: 1, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ticketIssued: true, ticketId: 'TKT-A' },

@@ -45,7 +45,7 @@ function reservationDurationSeconds(config) {
   return config.reservationDurationSeconds;
 }
 
-function publicRegistrationId(documentId) {
+export function publicRegistrationId(documentId) {
   return `VYR26-${documentId.toUpperCase()}`;
 }
 
@@ -96,7 +96,7 @@ function registrationResult(snapshot, registration, extra = {}) {
   };
 }
 
-function assertAvailableCapacity(capacity, workshop, participant) {
+export function assertAvailableCapacity(capacity, workshop, participant) {
   if (capacity.eventOccupied >= capacity.eventCapacity) {
     throw new AppError('EVENT_FULL', 'Registration capacity is full.', 409);
   }

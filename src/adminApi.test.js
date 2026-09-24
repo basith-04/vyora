@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adminRequest, AdminApiError, downloadRegistrationsCsv, reconcilePayment,
+  adminRequest, AdminApiError, createManualTicket, downloadRegistrationsCsv, reconcilePayment,
 } from './adminApi.js';
 
 function auth(tokens = ['token']) {
@@ -78,4 +78,16 @@ test('manual reconciliation sends only the registration ID in the protected path
     return new Response(JSON.stringify({ data: { outcome: 'CONFIRMED' } }), { status: 200 });
   });
   assert.deepEqual(await reconcilePayment(auth(), 'VYR26-TEST/SAFE'), { outcome: 'CONFIRMED' });
+});
+
+test('manual ticket sends participant, collected amount, and submission key through the protected API', async (context) => {
+  const input = { participant: { fullName: 'Participant' }, manualAmount: '123.45', idempotencyKey: 'key' };
+  context.mock.method(globalThis, 'fetch', async (path, options) => {
+    assert.equal(path, '/api/admin/manual-tickets');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    assert.deepEqual(JSON.parse(options.body), input);
+    return new Response(JSON.stringify({ data: { ticketId: 'TKT-1' } }), { status: 201 });
+  });
+  assert.deepEqual(await createManualTicket(auth(), input), { ticketId: 'TKT-1' });
 });

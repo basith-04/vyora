@@ -19,6 +19,7 @@ import { createResendEmailProvider } from './services/email-provider.js';
 import { createConfirmationEmailService } from './services/confirmation-email.js';
 import { createManualReconciliationService } from './services/manual-reconciliation.js';
 import { createTicketEditService } from './services/ticket-edit.js';
+import { createManualTicketService } from './services/manual-ticket.js';
 
 const razorpayKeyId = defineSecret('RAZORPAY_KEY_ID');
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
@@ -78,6 +79,7 @@ const adminRouter = createAdminRouter({
   confirmationEmailService,
   manualReconciliationService,
   ticketEditService: createTicketEditService({ db }),
+  manualTicketService: createManualTicketService({ db, ticketService, confirmationEmailService, logger }),
 });
 
 export const api = onRequest(

@@ -3,7 +3,7 @@ import { requireAdminRole } from '../middleware/admin-auth.js';
 
 export function createAdminRouter({
   authorizeAdmin, reportingService, checkinService, confirmationEmailService,
-  manualReconciliationService, ticketEditService,
+  manualReconciliationService, ticketEditService, manualTicketService,
 }) {
   const router = Router();
   router.use(authorizeAdmin);
@@ -28,6 +28,13 @@ export function createAdminRouter({
       next(error);
     }
   });
+
+  if (manualTicketService) {
+    router.post('/manual-tickets', requireAdminRole, async (request, response, next) => {
+      try { response.status(201).json({ data: await manualTicketService.create(request.body, request.admin) }); }
+      catch (error) { next(error); }
+    });
+  }
 
   if (ticketEditService) {
     router.get('/edit-ticket/:registrationId', requireAdminRole, async (request, response, next) => {

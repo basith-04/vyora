@@ -1,0 +1,11 @@
+.manual-ticket-panel { max-width: 980px; }
+.manual-ticket-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.manual-ticket-form label { display: grid; gap: 7px; font-weight: 700; }
+.manual-ticket-form input, .manual-ticket-form select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #86949d; border-radius: 4px; background: #fff; color: #102b3b; font: inherit; }
+.manual-field-error { color: #b52323; font-weight: 600; }
+.manual-review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 22px; margin: 20px 0; }
+.manual-review div { padding: 10px 0; border-bottom: 1px solid #ccd5d9; }
+.manual-review dt { font-size: .8rem; text-transform: uppercase; }
+.manual-review dd { margin: 4px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.manual-actions { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+@media (max-width: 680px) { .manual-ticket-form, .manual-review { grid-template-columns: 1fr; } }

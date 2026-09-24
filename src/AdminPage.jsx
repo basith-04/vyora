@@ -12,6 +12,7 @@ import {
 import './admin.css';
 import CheckInView from './CheckInView.jsx';
 import EditTicketView from './EditTicketView.jsx';
+import ManualTicketView from './ManualTicketView.jsx';
 
 const statusOptions = ['PAYMENT_PENDING', 'CONFIRMED', 'PAYMENT_FAILED', 'EXPIRED', 'CANCELLED'];
 const paymentOptions = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
@@ -312,7 +313,7 @@ export default function AdminPage() {
   const [registrations, setRegistrations] = useState([]);
   const [view, setView] = useState(() => {
     const path = window.location.pathname.replace(/\/+$/, '');
-    return path === '/admin/check-in' ? 'checkin' : path === '/admin/tickets' ? 'tickets' : path === '/admin/edit-ticket' ? 'edit-ticket' : 'overview';
+    return path === '/admin/check-in' ? 'checkin' : path === '/admin/tickets' ? 'tickets' : path === '/admin/edit-ticket' ? 'edit-ticket' : path === '/admin/manual-ticket' ? 'manual-ticket' : 'overview';
   });
   const [state, setState] = useState('authenticating');
   const [message, setMessage] = useState('');
@@ -370,7 +371,7 @@ export default function AdminPage() {
   };
   const selectView = (nextView) => {
     setView(nextView);
-    const path = nextView === 'checkin' ? '/admin/check-in' : nextView === 'tickets' ? '/admin/tickets' : nextView === 'edit-ticket' ? '/admin/edit-ticket' : '/admin';
+    const path = nextView === 'checkin' ? '/admin/check-in' : nextView === 'tickets' ? '/admin/tickets' : nextView === 'edit-ticket' ? '/admin/edit-ticket' : nextView === 'manual-ticket' ? '/admin/manual-ticket' : '/admin';
     if (window.location.pathname !== path) window.history.pushState(window.history.state, '', path);
   };
   const retryEmail = async (registrationId) => {
@@ -399,11 +400,11 @@ export default function AdminPage() {
   if (state === 'unauthorized') return <main className="admin-center-state"><h1>Access not authorized</h1><p>Your Firebase account is valid, but it is not an active VYORA admin or coordinator.</p><button onClick={() => logoutAdmin(auth)}>Sign out</button></main>;
   if (state === 'loading') return <main className="admin-center-state"><div className="admin-spinner" /><p>Loading protected event data…</p></main>;
   if (state === 'error') return <main className="admin-center-state"><h1>Dashboard unavailable</h1><p>{message}</p><div><button onClick={refresh}>Retry</button> <button onClick={() => logoutAdmin(auth)}>Sign out</button></div></main>;
-  if (['tickets', 'edit-ticket'].includes(view) && profile.role !== 'ADMIN') return <main className="admin-center-state"><h1>Access not authorized</h1><p>Administrator access is required.</p><button onClick={() => selectView('overview')}>Back to dashboard</button></main>;
+  if (['tickets', 'edit-ticket', 'reconciliation', 'manual-ticket'].includes(view) && profile.role !== 'ADMIN') return <main className="admin-center-state"><h1>Access not authorized</h1><p>Administrator access is required.</p><button onClick={() => selectView('overview')}>Back to dashboard</button></main>;
 
   return <div className="admin-app">
     <header className="admin-header"><div><p className="admin-kicker">VYORA '26 // OPERATIONS</p><h1>Staff Dashboard</h1></div><div className="admin-identity"><span>{profile.name}<small>{profile.role} · {profile.email}</small></span><button className="secondary-button" onClick={refresh}>Refresh</button><button onClick={() => logoutAdmin(auth)}>Logout</button></div></header>
-    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['tickets', 'Tickets'], ['edit-ticket', 'Edit Ticket'], ['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
+    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['tickets', 'Tickets'], ['edit-ticket', 'Edit Ticket'], ['manual-ticket', 'Manual Ticket'], ['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
     {message && <div className="admin-page-message" role="alert">{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}>×</button></div>}
     <main className="admin-content">
       {view === 'overview' && <Overview dashboard={dashboard} canReconcilePayment={profile.role === 'ADMIN'} onReconcilePayment={() => selectView('reconciliation')} />}
@@ -413,6 +414,7 @@ export default function AdminPage() {
       {view === 'checkin' && <CheckInView auth={auth} />}
       {view === 'tickets' && profile.role === 'ADMIN' && <TicketsView auth={auth} />}
       {view === 'edit-ticket' && profile.role === 'ADMIN' && <EditTicketView auth={auth} registrations={registrations} onChanged={refreshReportingData} />}
+      {view === 'manual-ticket' && profile.role === 'ADMIN' && <ManualTicketView auth={auth} onChanged={refreshReportingData} onOpenRegistration={openDetail} onOpenTickets={() => selectView('tickets')} />}
       {view === 'reconciliation' && profile.role === 'ADMIN' && <ManualPaymentReconciliation auth={auth} dashboard={dashboard} onChanged={refreshReportingData} />}
     </main>
     {detail && <Detail registration={detail.registrationId && !detail.fullName ? null : detail} loading={detailLoading} onClose={() => setDetail(null)} onRetryEmail={retryEmail} emailRetrying={emailRetrying} />}

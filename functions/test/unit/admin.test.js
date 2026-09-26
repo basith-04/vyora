@@ -82,6 +82,38 @@ test('Manual Ticket API requires an active ADMIN', async () => {
   assert.equal(calls, 1);
 });
 
+test('Transfer Ticket API allows ADMIN and rejects COORDINATOR before calling the service', async () => {
+  let reads = 0;
+  let writes = 0;
+  const makeApp = (profile) => {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/admin', createAdminRouter({
+      authorizeAdmin: createAdminAuthorization({
+        auth: { verifyIdToken: async () => ({ uid: 'staff-1' }) }, db: fakeDb(profile),
+      }),
+      reportingService: {},
+      ticketTransferService: {
+        detail: async () => { reads += 1; return { registrationId: 'VYR26-1' }; },
+        apply: async () => { writes += 1; return { registrationId: 'VYR26-1' }; },
+      },
+    }));
+    app.use((error, req, res, next) => res.status(error.status || 500).json({ error: { code: error.code } }));
+    return app;
+  };
+  const path = '/api/admin/transfer-ticket/VYR26-1';
+  const coordinatorApp = makeApp({ role: 'COORDINATOR', active: true });
+  assert.equal((await request(coordinatorApp).get(path).set('Authorization', 'Bearer valid')).status, 403);
+  assert.equal((await request(coordinatorApp).post(path).set('Authorization', 'Bearer valid').send({})).status, 403);
+  assert.equal(reads, 0);
+  assert.equal(writes, 0);
+  const adminApp = makeApp({ role: 'ADMIN', active: true });
+  assert.equal((await request(adminApp).get(path).set('Authorization', 'Bearer valid')).status, 200);
+  assert.equal((await request(adminApp).post(path).set('Authorization', 'Bearer valid').send({})).status, 200);
+  assert.equal(reads, 1);
+  assert.equal(writes, 1);
+});
+
 test('Tickets report counts only active tickets with matching confirmed paid registrations', () => {
   const registrations = [
     { _docId: 'a', registrationId: 'VYR26-A', fullName: 'Alice', year: 1, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ticketIssued: true, ticketId: 'TKT-A' },

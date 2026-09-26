@@ -27,11 +27,32 @@ export function validateAccommodation(value) {
   return value;
 }
 
-function validTicket(registration, ticket, registrationDocId) {
+export function validTicket(registration, ticket, registrationDocId) {
   return registration.registrationStatus === 'CONFIRMED' && registration.paymentStatus === 'PAID'
     && registration.ticketIssued === true && ticket?.active === true
     && ticket.registrationDocId === registrationDocId
     && registration.ticketId === ticket.ticketId && registration.registrationId === ticket.registrationId;
+}
+
+export function validateManualPayment(value) {
+  assertKeys(value, ['amountPaise', 'reason']);
+  const { amountPaise, reason } = value;
+  if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0
+    || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 200) {
+    throw new AppError('INVALID_MANUAL_PAYMENT', 'Enter a positive INR amount and a reason.', 400);
+  }
+  return { amountPaise, reason: reason.trim() };
+}
+
+export function assertManualPaymentHistory(registration) {
+  if (registration.manualPayments != null && !Array.isArray(registration.manualPayments)) {
+    throw new AppError('INTERNAL_ERROR', 'Manual payment history is invalid.', 500);
+  }
+}
+
+export function appendManualPayment(registration, manualPayment, now, uid) {
+  assertManualPaymentHistory(registration);
+  return [...(registration.manualPayments || []), { ...manualPayment, collectedAt: now, recordedBy: uid }];
 }
 
 function publicDetail(registration, ticket) {
@@ -87,13 +108,7 @@ export function createTicketEditService({ db, clock = () => Date.now() }) {
     const accommodation = Object.hasOwn(input, 'accommodation') ? validateAccommodation(input.accommodation) : null;
     let manualPayment = null;
     if (Object.hasOwn(input, 'manualPayment')) {
-      assertKeys(input.manualPayment, ['amountPaise', 'reason']);
-      const { amountPaise, reason } = input.manualPayment;
-      if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0
-        || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 200) {
-        throw new AppError('INVALID_MANUAL_PAYMENT', 'Enter a positive INR amount and a reason.', 400);
-      }
-      manualPayment = { amountPaise, reason: reason.trim() };
+      manualPayment = validateManualPayment(input.manualPayment);
     }
     const ref = await find(registrationId);
     const ticketRef = db.collection(COLLECTIONS.tickets).doc(ref.id);
@@ -113,9 +128,7 @@ export function createTicketEditService({ db, clock = () => Date.now() }) {
       if (current.updatedAt?.toDate?.().toISOString() !== input.expectedUpdatedAt) {
         throw new AppError('TICKET_EDIT_STALE', 'The registration changed. Reload and review it again.', 409);
       }
-      if (current.manualPayments != null && !Array.isArray(current.manualPayments)) {
-        throw new AppError('INTERNAL_ERROR', 'Manual payment history is invalid.', 500);
-      }
+      assertManualPaymentHistory(current);
       const before = Object.fromEntries(ACCOMMODATION_FIELDS.map((field) => [field, current[field]]));
       const after = accommodation || before;
       const changed = ACCOMMODATION_FIELDS.some((field) => before[field] !== after[field]);
@@ -123,10 +136,7 @@ export function createTicketEditService({ db, clock = () => Date.now() }) {
       const now = Timestamp.fromMillis(clock());
       const update = { updatedAt: now };
       if (changed) Object.assign(update, after);
-      if (manualPayment) update.manualPayments = [
-        ...(current.manualPayments || []),
-        { ...manualPayment, collectedAt: now, recordedBy: admin.uid },
-      ];
+      if (manualPayment) update.manualPayments = appendManualPayment(current, manualPayment, now, admin.uid);
       transaction.update(ref, update);
       transaction.create(auditRef, {
         action: 'TICKET_EDIT', registrationDocId: ref.id, registrationId: current.registrationId,

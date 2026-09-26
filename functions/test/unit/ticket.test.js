@@ -25,6 +25,19 @@ test('ticket-view credential is stable, opaque, and domain-separated from the QR
   assert.equal(ticketTokenHash(view).length, 64);
 });
 
+test('credential revision preserves original credentials and gives both transfer credentials new opaque values', () => {
+  const secret = 'a-secure-ticket-signing-secret-of-at-least-32-characters';
+  const id = 'internal-registration-doc';
+  assert.equal(ticketPayloadForRegistration(id, secret, 0), ticketPayloadForRegistration(id, secret));
+  assert.equal(ticketViewTokenForRegistration(id, secret, 0), ticketViewTokenForRegistration(id, secret));
+  const newQr = ticketPayloadForRegistration(id, secret, 1);
+  const newView = ticketViewTokenForRegistration(id, secret, 1);
+  assert.notEqual(newQr, ticketPayloadForRegistration(id, secret));
+  assert.notEqual(newView, ticketViewTokenForRegistration(id, secret));
+  assert.equal(isTicketPayload(newQr), true);
+  assert.equal(isTicketViewToken(newView), true);
+});
+
 test('malformed ticket payloads are rejected', () => {
   for (const value of [null, '', 'VYR26-123', 'vyora26:t:short', `vyora26:t:${'='.repeat(43)}`]) {
     assert.equal(isTicketPayload(value), false);

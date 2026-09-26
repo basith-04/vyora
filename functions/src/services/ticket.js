@@ -19,16 +19,16 @@ function signingSecret(getSigningSecret) {
   return secret;
 }
 
-export function ticketPayloadForRegistration(registrationDocId, secret) {
+export function ticketPayloadForRegistration(registrationDocId, secret, version = 0) {
   const credential = createHmac('sha256', secret)
-    .update(`vyora26:ticket:v1:${registrationDocId}`)
+    .update(`vyora26:ticket:v1:${registrationDocId}${version ? `:transfer:${version}` : ''}`)
     .digest('base64url');
   return `${PAYLOAD_PREFIX}${credential}`;
 }
 
-export function ticketViewTokenForRegistration(registrationDocId, secret) {
+export function ticketViewTokenForRegistration(registrationDocId, secret, version = 0) {
   const credential = createHmac('sha256', secret)
-    .update(`vyora26:ticket-view:v1:${registrationDocId}`)
+    .update(`vyora26:ticket-view:v1:${registrationDocId}${version ? `:transfer:${version}` : ''}`)
     .digest('base64url');
   return `${VIEW_TOKEN_PREFIX}${credential}`;
 }
@@ -64,9 +64,9 @@ export function createTicketService({
   clock = () => Date.now(),
   random = randomBytes,
 }) {
-  function derived(registrationDocId) {
-    const payload = ticketPayloadForRegistration(registrationDocId, signingSecret(getSigningSecret));
-    const viewToken = ticketViewTokenForRegistration(registrationDocId, signingSecret(getSigningSecret));
+  function derived(registrationDocId, version = 0) {
+    const payload = ticketPayloadForRegistration(registrationDocId, signingSecret(getSigningSecret), version);
+    const viewToken = ticketViewTokenForRegistration(registrationDocId, signingSecret(getSigningSecret), version);
     return {
       payload,
       hash: ticketTokenHash(payload),
@@ -91,7 +91,6 @@ export function createTicketService({
 
   async function issueForRegistrationRef(registrationRef) {
     const ticketRef = db.collection(COLLECTIONS.tickets).doc(registrationRef.id);
-    const credential = derived(registrationRef.id);
     const candidateTicketId = ticketId(random);
     const result = await db.runTransaction(async (transaction) => {
       const [registrationSnapshot, existingTicketSnapshot] = await transaction.getAll(registrationRef, ticketRef);
@@ -101,6 +100,7 @@ export function createTicketService({
       const registration = registrationSnapshot.data();
       assertConfirmed(registration);
       const existing = existingTicketSnapshot.data();
+      const credential = derived(registrationRef.id, existing?.credentialVersion || 0);
       if (existing) {
         if (existing.registrationDocId !== registrationRef.id || existing.qrTokenHash !== credential.hash) {
           throw configurationError('The stored ticket does not match the configured ticket credential.');
@@ -140,6 +140,7 @@ export function createTicketService({
       });
       return { ticket, registration, created: true };
     });
+    const credential = derived(registrationRef.id, result.ticket.credentialVersion || 0);
     return { ...result, ticketPayload: credential.payload, ticketViewToken: credential.viewToken };
   }
 
@@ -160,7 +161,7 @@ export function createTicketService({
     const registration = registrationSnapshot.data();
     const ticket = ticketSnapshot.data();
     assertConfirmed(registration);
-    const credential = derived(registrationRef.id);
+    const credential = derived(registrationRef.id, ticket.credentialVersion || 0);
     if (
       ticket.active !== true
       || ticket.registrationDocId !== registrationRef.id
@@ -208,9 +209,10 @@ export function createTicketService({
     }
     const registration = registrationSnapshot.data();
     assertConfirmed(registration);
-    const credential = derived(ticket.registrationDocId);
+    const credential = derived(ticket.registrationDocId, ticket.credentialVersion || 0);
     if (
       ticket.active !== true
+      || ticket.viewTokenHash !== credential.viewTokenHash
       || ticket.qrTokenHash !== credential.hash
       || registration.ticketIssued !== true
       || registration.ticketId !== ticket.ticketId
@@ -243,6 +245,16 @@ export function createTicketService({
   }
 
   return {
+    rotatedCredential(registrationDocId, ticket) {
+      const currentVersion = ticket.credentialVersion || 0;
+      const current = derived(registrationDocId, currentVersion);
+      if (!Number.isSafeInteger(currentVersion) || currentVersion < 0
+        || ticket.qrTokenHash !== current.hash || ticket.viewTokenHash !== current.viewTokenHash) {
+        throw configurationError('The stored ticket credential cannot be rotated safely.');
+      }
+      const credentialVersion = currentVersion + 1;
+      return { credentialVersion, ...derived(registrationDocId, credentialVersion) };
+    },
     issueForRegistrationRef,
     existingForRegistrationRef,
     participantTicket,

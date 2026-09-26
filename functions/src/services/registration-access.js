@@ -2,8 +2,9 @@ import { AppError } from '../errors.js';
 import { COLLECTIONS } from '../config/constants.js';
 
 export function registrationHasRecoveryToken(registration, recoveryTokenHash) {
-  return registration?.recoveryTokenHash === recoveryTokenHash
-    || registration?.recoveryTokenHashes?.includes(recoveryTokenHash) === true;
+  return typeof recoveryTokenHash === 'string' && /^[a-f0-9]{64}$/.test(recoveryTokenHash)
+    && (registration?.recoveryTokenHash === recoveryTokenHash
+    || registration?.recoveryTokenHashes?.includes(recoveryTokenHash) === true);
 }
 
 export async function findRegistrationByPublicId(db, registrationId) {

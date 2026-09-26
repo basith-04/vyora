@@ -65,6 +65,7 @@ export function createConfirmationEmailService({
       const now = Timestamp.fromMillis(nowMillis);
       const next = {
         status: 'SENDING',
+        ...(state.deliveryVersion ? { deliveryVersion: state.deliveryVersion } : {}),
         attempts: (state.attempts || 0) + 1,
         sentAt: state.sentAt || null,
         lastAttemptAt: now,
@@ -77,13 +78,14 @@ export function createConfirmationEmailService({
     });
   }
 
-  async function finish(registrationRef, attempt, update) {
+  async function finish(registrationRef, attempt, version, update) {
     await db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(registrationRef);
       if (!snapshot.exists) return;
       const registration = snapshot.data();
       const state = currentState(registration);
-      if (state.status !== 'SENDING' || state.attempts !== attempt) return;
+      if (state.status !== 'SENDING' || state.attempts !== attempt
+        || (state.deliveryVersion || 0) !== version) return;
       const now = timestamp(clock);
       transaction.update(registrationRef, {
         confirmationEmail: { ...state, ...update, leaseExpiresAt: null },
@@ -96,6 +98,7 @@ export function createConfirmationEmailService({
     const claimed = await claim(registrationRef, issued, allowRetry);
     if (claimed.outcome !== 'CLAIMED') return claimed;
     const attempt = claimed.state.attempts;
+    const version = issued.ticket.credentialVersion || 0;
     try {
       const content = confirmationEmailContent({
         registration: claimed.registration,
@@ -107,17 +110,17 @@ export function createConfirmationEmailService({
         subject: content.subject,
         html: content.html,
         text: content.text,
-        idempotencyKey: `vyora26-confirmation/${registrationRef.id}`,
+        idempotencyKey: `vyora26-confirmation/${registrationRef.id}${version ? `/transfer/${version}` : ''}`,
       });
       const sentAt = timestamp(clock);
-      await finish(registrationRef, attempt, {
+      await finish(registrationRef, attempt, version, {
         status: 'SENT', sentAt, lastErrorCode: null,
         providerMessageId: delivered.providerMessageId,
       });
       return { outcome: 'SENT', sentAt: sentAt.toDate().toISOString(), attempts: attempt };
     } catch (error) {
       const code = safeErrorCode(error);
-      await finish(registrationRef, attempt, { status: 'FAILED', lastErrorCode: code });
+      await finish(registrationRef, attempt, version, { status: 'FAILED', lastErrorCode: code });
       logger.error('Confirmation email delivery failed.', {
         registrationId: claimed.registration.registrationId,
         operation: 'send_confirmation_email',

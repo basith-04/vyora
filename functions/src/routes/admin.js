@@ -3,7 +3,7 @@ import { requireAdminRole } from '../middleware/admin-auth.js';
 
 export function createAdminRouter({
   authorizeAdmin, reportingService, checkinService, confirmationEmailService,
-  manualReconciliationService, ticketEditService, manualTicketService,
+  manualReconciliationService, ticketEditService, ticketTransferService, manualTicketService,
 }) {
   const router = Router();
   router.use(authorizeAdmin);
@@ -43,6 +43,17 @@ export function createAdminRouter({
     });
     router.post('/edit-ticket/:registrationId', requireAdminRole, async (request, response, next) => {
       try { response.json({ data: await ticketEditService.apply(request.params.registrationId, request.body, request.admin) }); }
+      catch (error) { next(error); }
+    });
+  }
+
+  if (ticketTransferService) {
+    router.get('/transfer-ticket/:registrationId', requireAdminRole, async (request, response, next) => {
+      try { response.json({ data: await ticketTransferService.detail(request.params.registrationId, request.admin) }); }
+      catch (error) { next(error); }
+    });
+    router.post('/transfer-ticket/:registrationId', requireAdminRole, async (request, response, next) => {
+      try { response.json({ data: await ticketTransferService.apply(request.params.registrationId, request.body, request.admin) }); }
       catch (error) { next(error); }
     });
   }

@@ -53,6 +53,10 @@ export const loadTicketEdit = (auth, id) => adminRequest(auth, `/api/admin/edit-
 export const saveTicketEdit = (auth, id, input) => adminRequest(auth, `/api/admin/edit-ticket/${encodeURIComponent(id)}`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
 });
+export const loadTicketTransfer = (auth, id) => adminRequest(auth, `/api/admin/transfer-ticket/${encodeURIComponent(id)}`);
+export const submitTicketTransfer = (auth, id, input) => adminRequest(auth, `/api/admin/transfer-ticket/${encodeURIComponent(id)}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+});
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export function downloadRegistrationsCsv(auth, search = '', filters = {}) {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   adminRequest, AdminApiError, createManualTicket, downloadRegistrationsCsv, reconcilePayment,
+  loadTicketTransfer, submitTicketTransfer,
 } from './adminApi.js';
 
 function auth(tokens = ['token']) {
@@ -90,4 +91,22 @@ test('manual ticket sends participant, collected amount, and submission key thro
     return new Response(JSON.stringify({ data: { ticketId: 'TKT-1' } }), { status: 201 });
   });
   assert.deepEqual(await createManualTicket(auth(), input), { ticketId: 'TKT-1' });
+});
+
+test('transfer ticket reads and submits through the protected admin API', async (context) => {
+  const input = { requestId: 'key', participant: { fullName: 'New holder' } };
+  let calls = 0;
+  context.mock.method(globalThis, 'fetch', async (path, options) => {
+    calls += 1;
+    assert.equal(path, '/api/admin/transfer-ticket/VYR26-TEST');
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    if (calls === 1) assert.equal(options.method, undefined);
+    else {
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(JSON.parse(options.body), input);
+    }
+    return new Response(JSON.stringify({ data: { registrationId: 'VYR26-TEST' } }), { status: 200 });
+  });
+  assert.equal((await loadTicketTransfer(auth(), 'VYR26-TEST')).registrationId, 'VYR26-TEST');
+  assert.equal((await submitTicketTransfer(auth(), 'VYR26-TEST', input)).registrationId, 'VYR26-TEST');
 });

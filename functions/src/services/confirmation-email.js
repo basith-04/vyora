@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { AppError } from '../errors.js';
 import { COLLECTIONS, PAYMENT_STATUS, REGISTRATION_STATUS } from '../config/constants.js';
+import { findRegistrationByPublicId } from './registration-access.js';
 import { confirmationEmailContent } from './email-template.js';
 
 const MAX_ATTEMPTS = 3;
@@ -24,6 +25,16 @@ function currentState(registration) {
   };
 }
 
+function assertEmailTicket(registration, ticket, issued, documentId) {
+  if (!registration || !ticket || registration.registrationStatus !== REGISTRATION_STATUS.confirmed
+    || registration.paymentStatus !== PAYMENT_STATUS.paid || registration.ticketIssued !== true
+    || registration.ticketId !== ticket.ticketId || ticket.active !== true
+    || ticket.registrationDocId !== documentId || ticket.registrationId !== registration.registrationId
+    || ticket.viewTokenHash !== issued.ticket.viewTokenHash || ticket.qrTokenHash !== issued.ticket.qrTokenHash) {
+    throw new AppError('TICKET_NOT_AVAILABLE', 'A confirmed active ticket is required before email delivery.', 409);
+  }
+}
+
 export function createConfirmationEmailService({
   db,
   ticketService,
@@ -32,6 +43,13 @@ export function createConfirmationEmailService({
   clock = () => Date.now(),
   logger = console,
 }) {
+  async function deliver(registration, issued, idempotencyKey) {
+    const content = confirmationEmailContent({ registration,
+      ticketViewToken: issued.ticketViewToken, baseUrl: getPublicBaseUrl() });
+    return provider.send({ to: registration.email, subject: content.subject,
+      html: content.html, text: content.text, idempotencyKey });
+  }
+
   async function claim(registrationRef, issued, allowRetry) {
     const ticketRef = db.collection(COLLECTIONS.tickets).doc(registrationRef.id);
     return db.runTransaction(async (transaction) => {
@@ -41,16 +59,7 @@ export function createConfirmationEmailService({
       }
       const registration = registrationSnapshot.data();
       const ticket = ticketSnapshot.data();
-      if (
-        registration.registrationStatus !== REGISTRATION_STATUS.confirmed
-        || registration.paymentStatus !== PAYMENT_STATUS.paid
-        || registration.ticketIssued !== true
-        || registration.ticketId !== ticket.ticketId
-        || ticket.active !== true
-        || ticket.viewTokenHash !== issued.ticket.viewTokenHash
-      ) {
-        throw new AppError('TICKET_NOT_AVAILABLE', 'A confirmed active ticket is required before email delivery.', 409);
-      }
+      assertEmailTicket(registration, ticket, issued, registrationRef.id);
       const state = currentState(registration);
       if (state.status === 'SENT') return { outcome: 'SENT', state, registration };
       const clockValue = clock();
@@ -100,18 +109,8 @@ export function createConfirmationEmailService({
     const attempt = claimed.state.attempts;
     const version = issued.ticket.credentialVersion || 0;
     try {
-      const content = confirmationEmailContent({
-        registration: claimed.registration,
-        ticketViewToken: issued.ticketViewToken,
-        baseUrl: getPublicBaseUrl(),
-      });
-      const delivered = await provider.send({
-        to: claimed.registration.email,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-        idempotencyKey: `vyora26-confirmation/${registrationRef.id}${version ? `/transfer/${version}` : ''}`,
-      });
+      const delivered = await deliver(claimed.registration, issued,
+        `vyora26-confirmation/${registrationRef.id}${version ? `/transfer/${version}` : ''}`);
       const sentAt = timestamp(clock);
       await finish(registrationRef, attempt, version, {
         status: 'SENT', sentAt, lastErrorCode: null,
@@ -144,5 +143,82 @@ export function createConfirmationEmailService({
     return sendForRegistrationRef(registrationRef, issued, { allowRetry: true });
   }
 
-  return { sendForRegistrationRef, retryByRegistrationId };
+  function assertAdmin(admin) {
+    if (admin?.role !== 'ADMIN' || !admin.uid) throw new AppError('FORBIDDEN', 'Administrator access is required.', 403);
+  }
+
+  async function resendDetail(registrationId, admin) {
+    assertAdmin(admin);
+    const { ref } = await findRegistrationByPublicId(db, registrationId);
+    const { registration, ticket } = await ticketService.existingForRegistrationRef(ref);
+    return { registrationId: registration.registrationId, fullName: registration.fullName,
+      email: registration.email, ticketId: ticket.ticketId };
+  }
+
+  async function resendByRegistrationId(registrationId, input, admin) {
+    assertAdmin(admin);
+    if (!input || typeof input !== 'object' || Array.isArray(input)
+      || Object.keys(input).length !== 1 || typeof input.requestId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.requestId)) {
+      throw new AppError('INVALID_EMAIL_RESEND', 'The resend request is invalid.', 400);
+    }
+    const { ref } = await findRegistrationByPublicId(db, registrationId);
+    // Read-only lookup validates current credentials. Never issue or rotate a ticket.
+    const issued = await ticketService.existingForRegistrationRef(ref);
+    const ticketRef = db.collection(COLLECTIONS.tickets).doc(ref.id);
+    const requestId = input.requestId.toLowerCase();
+    const auditRef = db.collection(COLLECTIONS.auditLogs).doc(`ticket_email_resend_${requestId}`);
+    const claimRef = db.collection(COLLECTIONS.auditLogs).doc(`ticket_email_resend_claim_${ref.id}`);
+    const claimed = await db.runTransaction(async (tx) => {
+      const [registrationSnapshot, ticketSnapshot, auditSnapshot, claimSnapshot] = await tx.getAll(ref, ticketRef, auditRef, claimRef);
+      const registration = registrationSnapshot.data();
+      const ticket = ticketSnapshot.data();
+      // Recheck the ticket obtained by the canonical read helper inside the claim.
+      assertEmailTicket(registration, ticket, issued, ref.id);
+      if (registration.email !== issued.registration.email) {
+        throw new AppError('TICKET_NOT_AVAILABLE', 'The participant changed. Review the current ticket again.', 409);
+      }
+      const previous = auditSnapshot.data();
+      if (previous && (previous.registrationDocId !== ref.id || previous.performedBy !== admin.uid)) {
+        throw new AppError('INVALID_EMAIL_RESEND', 'The resend request was already used.', 409);
+      }
+      if (previous?.status === 'SENT') return { outcome: 'SENT' };
+      const now = timestamp(clock);
+      const lease = claimSnapshot.data();
+      if (lease?.leaseExpiresAt?.toMillis() > now.toMillis()) return { outcome: 'IN_PROGRESS' };
+      // An expired/failed attempt may be retried only for the same current ticket.
+      if (previous && (previous.ticketId !== ticket.ticketId || previous.credentialVersion !== (ticket.credentialVersion || 0))) {
+        throw new AppError('INVALID_EMAIL_RESEND', 'The current ticket changed. Review it again.', 409);
+      }
+      if ((previous?.attempts || 0) >= MAX_ATTEMPTS) return { outcome: 'RETRY_LIMIT_REACHED' };
+      const attempt = (previous?.attempts || 0) + 1;
+      tx.set(claimRef, { action: 'TICKET_EMAIL_RESEND_CLAIM', registrationDocId: ref.id,
+        registrationId, performedBy: admin.uid, requestId, createdAt: now,
+        leaseExpiresAt: Timestamp.fromMillis(now.toMillis() + LEASE_MILLISECONDS) });
+      tx.set(auditRef, { action: 'TICKET_EMAIL_RESEND', registrationDocId: ref.id,
+        registrationId, ticketId: ticket.ticketId, credentialVersion: ticket.credentialVersion || 0, performedBy: admin.uid,
+        createdAt: previous?.createdAt || now, lastAttemptAt: now,
+        attempts: attempt, status: 'SENDING', lastErrorCode: null });
+      return { outcome: 'CLAIMED', registration, attempt };
+    });
+    if (claimed.outcome !== 'CLAIMED') return { outcome: claimed.outcome };
+    let status = 'SENT';
+    let errorCode = null;
+    try {
+      await deliver(claimed.registration, issued, `vyora26-ticket-resend/${requestId}`);
+    } catch (error) {
+      status = 'FAILED'; errorCode = safeErrorCode(error);
+      logger.error('Ticket email resend failed.', { operation: 'ticket_email_resend', code: errorCode });
+    }
+    await db.runTransaction(async (tx) => {
+      const [auditSnapshot, claimSnapshot] = await tx.getAll(auditRef, claimRef);
+      if (auditSnapshot.data()?.attempts !== claimed.attempt || auditSnapshot.data()?.status !== 'SENDING') return;
+      tx.update(auditRef, { status, lastErrorCode: errorCode, completedAt: timestamp(clock) });
+      if (claimSnapshot.data()?.requestId === requestId) tx.update(claimRef, { leaseExpiresAt: null });
+    });
+    return { outcome: status };
+  }
+
+  return { sendForRegistrationRef, retryByRegistrationId, resendDetail, resendByRegistrationId };
+
 }

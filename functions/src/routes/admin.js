@@ -97,6 +97,15 @@ export function createAdminRouter({
   }
 
   if (confirmationEmailService) {
+    router.get('/registrations/:registrationId/ticket-email', requireAdminRole, async (request, response, next) => {
+      try { response.json({ data: await confirmationEmailService.resendDetail(request.params.registrationId, request.admin) }); }
+      catch (error) { next(error); }
+    });
+    router.post('/registrations/:registrationId/ticket-email/resend', requireAdminRole, async (request, response, next) => {
+      try { response.json({ data: await confirmationEmailService.resendByRegistrationId(request.params.registrationId, request.body, request.admin) }); }
+      catch (error) { next(error); }
+    });
+
     router.post('/registrations/:registrationId/confirmation-email/retry', async (request, response, next) => {
       try {
         const data = await confirmationEmailService.retryByRegistrationId(request.params.registrationId);

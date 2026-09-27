@@ -59,12 +59,13 @@ export const submitTicketTransfer = (auth, id, input) => adminRequest(auth, `/ap
 });
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
-export function downloadRegistrationsCsv(auth, search = '', filters = {}) {
+export function downloadRegistrationsCsv(auth, search = '', filters = {}, columns) {
   const query = new URLSearchParams();
   if (search.trim()) query.set('search', search.trim());
   for (const [name, value] of Object.entries(filters)) {
     if (value) query.set(name, value);
   }
+  if (columns !== undefined) query.set('columns', columns.join(','));
   const suffix = query.size ? `?${query.toString()}` : '';
   return adminRequest(auth, `/api/admin/export/registrations.csv${suffix}`, { responseType: 'blob' });
 }

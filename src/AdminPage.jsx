@@ -1,3 +1,4 @@
+import { CSV_FIELDS, ALL_CSV_COLUMNS, DEFAULT_CSV_COLUMNS, allCsvColumnsSelected, toggleCsvColumn } from '../functions/shared/csv-fields.js';
 import TicketEmailResenderView from './TicketEmailResenderView.jsx';
 import React, { useEffect, useMemo, useState } from 'react';
 import { getAdminAuth } from './firebaseClient.js';
@@ -169,7 +170,7 @@ function RegistrationTable({ registrations, onOpen }) {
   );
 }
 
-function RegistrationsView({ registrations, onOpen, search, setSearch, filters, setFilters }) {
+function RegistrationsView({ registrations, onOpen, search, setSearch, filters, setFilters, csvColumns, setCsvColumns, onExport, exporting }) {
   const result = useMemo(() => filterRegistrations(registrations, search, filters), [registrations, search, filters]);
   const change = (event) => setFilters((current) => ({ ...current, [event.target.name]: event.target.value }));
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -189,6 +190,16 @@ function RegistrationsView({ registrations, onOpen, search, setSearch, filters, 
       <FilterSelect label="Reconciliation" name="reconciliation" value={filters.reconciliation} onChange={change}><option value="true">Required</option><option value="false">Not Required</option></FilterSelect>
       <FilterSelect label="Event check-in" name="eventCheckin" value={filters.eventCheckin} onChange={change}><option value="true">Checked in</option><option value="false">Not checked in</option></FilterSelect>
       <FilterSelect label="Workshop check-in" name="workshopCheckin" value={filters.workshopCheckin} onChange={change}><option value="true">Checked in</option><option value="false">Not checked in</option></FilterSelect>
+      <FilterSelect label="Gender" name="gender" value={filters.gender} onChange={change}><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option><option value="NOT_PROVIDED">Not provided</option></FilterSelect>
+      <FilterSelect label="Food preference" name="foodPreference" value={filters.foodPreference} onChange={change}><option value="VEG">VEG</option><option value="NON_VEG">NON_VEG</option><option value="NOT_PROVIDED">Not provided</option></FilterSelect>
+      <FilterSelect label="Completion details" name="completionDetails" value={filters.completionDetails} onChange={change}><option value="COMPLETED">Completed</option><option value="NOT_COMPLETED">Not completed</option></FilterSelect>
+    </div>
+    <div className="admin-csv-fields" aria-labelledby="csv-fields-title">
+      <div className="panel-heading"><div><h3 id="csv-fields-title">CSV FIELDS</h3><span>Select the columns to export with the active filters.</span></div></div>
+      <label className="admin-csv-all"><input type="checkbox" checked={allCsvColumnsSelected(csvColumns)} onChange={(event) => setCsvColumns(event.target.checked ? [...ALL_CSV_COLUMNS] : [])} /> All</label>
+      <div className="admin-csv-groups">{[...new Set(CSV_FIELDS.map((field) => field.group))].map((group) => <fieldset key={group}><legend>{group}</legend>{CSV_FIELDS.filter((field) => field.group === group).map((field) => <label key={field.key}><input type="checkbox" checked={csvColumns.includes(field.key)} onChange={() => setCsvColumns((current) => toggleCsvColumn(current, field.key))} /> {field.label}</label>)}</fieldset>)}</div>
+      {!csvColumns.length && <p className="admin-error" role="alert">Select at least one CSV field.</p>}
+      <button className="export-button" type="button" onClick={onExport} disabled={exporting || !csvColumns.length}>{exporting ? 'Exporting…' : 'EXPORT CSV'}</button>
     </div>
     <RegistrationTable registrations={result} onOpen={onOpen} />
   </section>;
@@ -322,6 +333,7 @@ export default function AdminPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [csvColumns, setCsvColumns] = useState([...DEFAULT_CSV_COLUMNS]);
   const [emailRetrying, setEmailRetrying] = useState(false);
   const [registrationSearch, setRegistrationSearch] = useState('');
   const [registrationFilters, setRegistrationFilters] = useState({ ...defaultFilters });
@@ -362,9 +374,10 @@ export default function AdminPage() {
   };
 
   const exportCsv = async () => {
+    if (!csvColumns.length) { setMessage('Select at least one CSV field.'); return; }
     setExporting(true); setMessage('');
     try {
-      const blob = await downloadRegistrationsCsv(auth, registrationSearch, registrationFilters);
+      const blob = await downloadRegistrationsCsv(auth, registrationSearch, registrationFilters, csvColumns);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'vyora-26-registrations.csv'; anchor.click();
       URL.revokeObjectURL(url);
@@ -406,11 +419,11 @@ export default function AdminPage() {
 
   return <div className="admin-app">
     <header className="admin-header"><div><p className="admin-kicker">VYORA '26 // OPERATIONS</p><h1>Staff Dashboard</h1></div><div className="admin-identity"><span>{profile.name}<small>{profile.role} · {profile.email}</small></span><button className="secondary-button" onClick={refresh}>Refresh</button><button onClick={() => logoutAdmin(auth)}>Logout</button></div></header>
-    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['ticket-email-resender', 'Ticket Email Resender'], ['tickets', 'Tickets'], ['edit-ticket', 'Edit Ticket'], ['transfer-ticket', 'Transfer Ticket'], ['manual-ticket', 'Manual Ticket'], ['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}<button className="export-button" onClick={exportCsv} disabled={exporting}>{exporting ? 'Exporting…' : 'Export CSV'}</button></nav>
+    <nav className="admin-tabs" aria-label="Admin sections">{[['overview', 'Overview'], ['registrations', 'Registrations'], ['workshops', 'Workshops'], ['accommodation', 'Accommodation'], ['checkin', 'Check-in'], ...(profile.role === 'ADMIN' ? [['ticket-email-resender', 'Ticket Email Resender'], ['tickets', 'Tickets'], ['edit-ticket', 'Edit Ticket'], ['transfer-ticket', 'Transfer Ticket'], ['manual-ticket', 'Manual Ticket'], ['reconciliation', 'Reconcile Payment']] : [])].map(([id, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => selectView(id)}>{label}</button>)}</nav>
     {message && <div className="admin-page-message" role="alert">{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}>×</button></div>}
     <main className="admin-content">
       {view === 'overview' && <Overview dashboard={dashboard} canReconcilePayment={profile.role === 'ADMIN'} onReconcilePayment={() => selectView('reconciliation')} />}
-      {view === 'registrations' && <RegistrationsView registrations={registrations} onOpen={openDetail} search={registrationSearch} setSearch={setRegistrationSearch} filters={registrationFilters} setFilters={setRegistrationFilters} />}
+      {view === 'registrations' && <RegistrationsView registrations={registrations} onOpen={openDetail} search={registrationSearch} setSearch={setRegistrationSearch} filters={registrationFilters} setFilters={setRegistrationFilters} csvColumns={csvColumns} setCsvColumns={setCsvColumns} onExport={exportCsv} exporting={exporting} />}
       {view === 'workshops' && <WorkshopView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'accommodation' && <AccommodationView dashboard={dashboard} registrations={registrations} onOpen={openDetail} />}
       {view === 'checkin' && <CheckInView auth={auth} />}

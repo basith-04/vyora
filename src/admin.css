@@ -190,3 +190,12 @@
   .reconciliation-search, .reconciliation-columns { grid-template-columns: 1fr; }
   .reconciliation-success { display: grid; }
 }
+
+.admin-csv-fields { margin: 1rem 0; padding: 1rem; border: 1px solid var(--admin-border); background: #f5f2e8; }
+.admin-csv-fields .panel-heading { margin-bottom: .75rem; }
+.admin-csv-fields h3 { margin: 0; font-size: .86rem; }
+.admin-csv-all, .admin-csv-groups label { display: flex; align-items: center; gap: .4rem; font-size: .75rem; cursor: pointer; }
+.admin-csv-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: .75rem; margin: .75rem 0 1rem; }
+.admin-csv-groups fieldset { display: grid; align-content: start; gap: .4rem; min-width: 0; padding: .6rem; border: 1px solid var(--admin-border); }
+.admin-csv-groups legend { font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.admin-csv-fields input[type='checkbox'] { accent-color: var(--admin-teal); }

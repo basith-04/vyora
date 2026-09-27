@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { loadTicketEdit, saveTicketEdit } from './adminApi.js';
-import { defaultFilters, filterRegistrations, hostelLabels } from './adminData.js';
+import ParticipantSearch from './ParticipantSearch.jsx';
+import { confirmedParticipantMatches, hostelLabels } from './adminData.js';
 
 function accommodationOf(item) {
   return { isHosteller: item.isHosteller, hostel: item.hostel, needsStay: item.needsStay, stayType: item.stayType };
@@ -28,12 +29,7 @@ export default function EditTicketView({ auth, registrations, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
-  const matches = useMemo(() => search.trim()
-    ? filterRegistrations(registrations, search, defaultFilters)
-      .filter((item) => item.registrationStatus === 'CONFIRMED' && item.paymentStatus === 'PAID')
-      .sort((a, b) => Number(b.fullName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
-        - Number(a.fullName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))
-    : [], [registrations, search]);
+  const matches = useMemo(() => confirmedParticipantMatches(registrations, search), [registrations, search]);
 
   const open = async (id) => {
     setBusy(true); setError(''); setSaved(false);
@@ -76,8 +72,7 @@ export default function EditTicketView({ auth, registrations, onChanged }) {
 
   return <div className="admin-stack">
     <section className="admin-panel"><div className="panel-heading"><h2>Edit Ticket</h2><span>ADMIN only</span></div>
-      <div className="admin-search"><label>Search participant by name<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Participant name" /></label></div>
-      {search.trim() && <div className="summary-list">{matches.length ? matches.map((item) => <button type="button" key={item.registrationId} onClick={() => open(item.registrationId)} disabled={busy}><span><strong>{item.fullName}</strong><small>{item.registrationId} · Year {item.year} · {item.department || '—'} {item.class || ''}</small></span><span>EDIT</span></button>) : <div className="admin-empty">No confirmed participants found.</div>}</div>}
+      <ParticipantSearch search={search} setSearch={setSearch} matches={matches} busy={busy} onSelect={(item) => open(item.registrationId)} action="EDIT" />
     </section>
     {error && <div className="admin-page-message" role="alert">{error}</div>}
     {selected && <section className="admin-panel">

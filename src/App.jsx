@@ -242,7 +242,7 @@ export default function App() {
   const isRegistration = activePath === '/registration';
   const isCompletion = activePath === '/complete-registration';
   const isTicket = activePath === '/ticket';
-  const isAdmin = activePath === '/admin' || activePath === '/admin/check-in' || activePath === '/admin/tickets' || activePath === '/admin/edit-ticket' || activePath === '/admin/manual-ticket';
+  const isAdmin = activePath === '/admin' || activePath === '/admin/check-in' || activePath === '/admin/tickets' || activePath === '/admin/edit-ticket' || activePath === '/admin/manual-ticket' || activePath === '/admin/ticket-email-resender';
   const isPolicy = informationPaths.has(activePath);
   const isStandalone = isCompletion || isRegistration || isTicket || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);

@@ -253,3 +253,34 @@ test('CSV export with zero matches produces an empty filtered result', () => {
   assert.deepEqual(filtered, []);
   assert.equal(registrationsCsv(filtered).trim().split('\r\n').length, 1);
 });
+
+test('ticket email lookup and resend require active ADMIN and return only safe results', async () => {
+  let calls = 0;
+  const makeApp = (profile) => {
+    const app = express(); app.use(express.json());
+    app.use('/api/admin', createAdminRouter({
+      authorizeAdmin: createAdminAuthorization({ auth: { verifyIdToken: async () => ({ uid: 'admin-1' }) }, db: fakeDb(profile) }),
+      confirmationEmailService: {
+        resendDetail: async (id, admin) => { calls++; assert.equal(admin.role, 'ADMIN'); return { registrationId: id, fullName: 'Devika', email: 'devika@example.com', ticketId: 'TKT-1' }; },
+        resendByRegistrationId: async (id, input, admin) => { calls++; assert.equal(id, 'VYR26-TEST'); assert.deepEqual(input, { requestId: 'request-key' }); assert.equal(admin.uid, 'admin-1'); return { outcome: 'SENT' }; },
+      },
+    }));
+    app.use((error, req, res, next) => res.status(error.status || 500).json({ error: { code: error.code } }));
+    return app;
+  };
+  const path = '/api/admin/registrations/VYR26-TEST/ticket-email';
+  for (const [profile, token, status] of [[null, false, 401], [null, true, 403], [{ role: 'COORDINATOR', active: true }, true, 403], [{ role: 'ADMIN', active: false }, true, 403]]) {
+    const app = makeApp(profile);
+    for (const method of ['get', 'post']) {
+      const req = request(app)[method](method === 'get' ? path : `${path}/resend`);
+      if (token) req.set('Authorization', 'Bearer valid');
+      assert.equal((await req.send({ requestId: 'request-key' })).status, status);
+    }
+  }
+  assert.equal(calls, 0);
+  const app = makeApp({ role: 'ADMIN', active: true });
+  const detail = await request(app).get(path).set('Authorization', 'Bearer valid');
+  assert.deepEqual(Object.keys(detail.body.data).sort(), ['email', 'fullName', 'registrationId', 'ticketId']);
+  const sent = await request(app).post(`${path}/resend`).set('Authorization', 'Bearer valid').send({ requestId: 'request-key' });
+  assert.deepEqual(sent.body, { data: { outcome: 'SENT' } });
+});

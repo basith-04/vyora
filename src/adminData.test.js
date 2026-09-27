@@ -47,3 +47,16 @@ test('admin auth helpers provide login, observer and logout behavior without sto
   await logoutAdmin(auth, async () => { signedOut = true; });
   assert.equal(signedOut, true);
 });
+
+test('ticket email resender reuses confirmed name search and is ADMIN only', async () => {
+  const { confirmedParticipantMatches, canAccessAdminView } = await import('./adminData.js');
+  const records = [
+    { registrationId: 'VYR26-A', fullName: 'Devika Suresh', email: 'first@example.com', registrationStatus: 'CONFIRMED', paymentStatus: 'PAID' },
+    { registrationId: 'VYR26-B', fullName: 'Devika Kumar', email: 'second@example.com', registrationStatus: 'CONFIRMED', paymentStatus: 'PAID' },
+    { registrationId: 'VYR26-C', fullName: 'Devika Pending', registrationStatus: 'PAYMENT_PENDING', paymentStatus: 'PENDING' },
+  ];
+  assert.deepEqual(confirmedParticipantMatches(records, ' devika ').map((item) => item.registrationId), ['VYR26-A', 'VYR26-B']);
+  assert.deepEqual(confirmedParticipantMatches(records, 'Suresh').map((item) => item.email), ['first@example.com']);
+  assert.equal(canAccessAdminView('ADMIN', 'ticket-email-resender'), true);
+  assert.equal(canAccessAdminView('COORDINATOR', 'ticket-email-resender'), false);
+});

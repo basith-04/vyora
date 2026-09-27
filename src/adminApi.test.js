@@ -110,3 +110,21 @@ test('transfer ticket reads and submits through the protected admin API', async 
   assert.equal((await loadTicketTransfer(auth(), 'VYR26-TEST')).registrationId, 'VYR26-TEST');
   assert.equal((await submitTicketTransfer(auth(), 'VYR26-TEST', input)).registrationId, 'VYR26-TEST');
 });
+
+test('ticket email resend sends only selected registration and stable request key', async () => {
+  const { loadTicketEmail, resendTicketEmail } = await import('./adminApi.js');
+  const original = globalThis.fetch;
+  const auth = { currentUser: { getIdToken: async () => 'admin-token' } };
+  const paths = [];
+  globalThis.fetch = async (path, options) => {
+    paths.push(path);
+    assert.equal(options.headers.Authorization, 'Bearer admin-token');
+    if (options.method === 'POST') assert.deepEqual(JSON.parse(options.body), { requestId: 'same-request' });
+    return { ok: true, status: 200, json: async () => ({ data: { outcome: 'SENT' } }) };
+  };
+  try {
+    await loadTicketEmail(auth, 'VYR26-SELECTED');
+    assert.deepEqual(await resendTicketEmail(auth, 'VYR26-SELECTED', 'same-request'), { outcome: 'SENT' });
+    assert.deepEqual(paths, ['/api/admin/registrations/VYR26-SELECTED/ticket-email', '/api/admin/registrations/VYR26-SELECTED/ticket-email/resend']);
+  } finally { globalThis.fetch = original; }
+});

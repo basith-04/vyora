@@ -1,3 +1,4 @@
+import CompleteRegistrationPage from './CompleteRegistrationPage.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import desktopHero from '../assets/hero-vjec-desktop.png';
 import mobileHero from '../assets/hero-vjec-mobile.png';
@@ -239,14 +240,16 @@ function ChapterBoundary() {
 export default function App() {
   const activePath = window.location.pathname.replace(/\/+$/, '') || '/';
   const isRegistration = activePath === '/registration';
+  const isCompletion = activePath === '/complete-registration';
   const isTicket = activePath === '/ticket';
   const isAdmin = activePath === '/admin' || activePath === '/admin/check-in' || activePath === '/admin/tickets' || activePath === '/admin/edit-ticket' || activePath === '/admin/manual-ticket';
   const isPolicy = informationPaths.has(activePath);
-  const isStandalone = isRegistration || isTicket || isPolicy || isAdmin;
+  const isStandalone = isCompletion || isRegistration || isTicket || isPolicy || isAdmin;
   const { activeSection, onSectionNavigate } = usePublicSectionTracking(!isStandalone);
 
   useEffect(() => {
     const titles = {
+      '/complete-registration': "Complete Registration | VYORA '26",
       '/about-us': "About Us | VYORA '26",
       '/contact-us': "Contact Us | VYORA '26",
       '/terms-and-conditions': "Terms & Conditions | VYORA '26",
@@ -264,7 +267,7 @@ export default function App() {
       <div className={`app-shell${isRegistration ? '' : ' public-app-shell'}`}>
         <WindowChrome />
         <Navbar activeSection={activeSection} isRegistration={isRegistration} isStandalone={isStandalone} onSectionNavigate={onSectionNavigate} />
-        {isRegistration ? <RegistrationClosedPage /> : isTicket ? <TicketPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
+        {isCompletion ? <CompleteRegistrationPage /> : isRegistration ? <RegistrationClosedPage /> : isTicket ? <TicketPage /> : isPolicy ? <PolicyPage path={activePath} /> : <main className="public-journey" id="main-content">
           <HomeHero />
           <ChapterBoundary />
           <ProgramPage />

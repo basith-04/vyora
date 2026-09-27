@@ -23,7 +23,7 @@ function ticketViewTokenFromBody(body) {
   return body.ticketViewToken;
 }
 
-export function createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger = console }) {
+export function createApp({ checkoutService, paymentService, webhookService, ticketService, completionService, adminRouter, logger = console }) {
   const app = express();
   app.disable('x-powered-by');
   app.use((request, response, next) => {
@@ -52,6 +52,21 @@ export function createApp({ checkoutService, paymentService, webhookService, tic
   app.use(express.json({ limit: '16kb', strict: true }));
 
   if (adminRouter) app.use('/api/admin', adminRouter);
+
+  app.post('/api/complete-registration', async (request, response) => {
+    try {
+      await completionService.limit(request.body);
+      const result = await completionService.submit(request.body);
+      return response.json(result.success === true ? { success: true } : { success: false, code: result.code });
+    } catch (error) {
+      if (error instanceof AppError && ['INVALID_COMPLETION', 'RATE_LIMITED'].includes(error.code)) {
+        return response.status(error.status).json({ success: false, code: error.code,
+          ...(error.details ? { fields: error.details.fields } : {}) });
+      }
+      logger.error('Completion request failed', { code: 'INTERNAL_ERROR' });
+      return response.status(500).json({ success: false, code: 'INTERNAL_ERROR' });
+    }
+  });
 
   app.post('/api/registrations', async (request, response, next) => {
     try {

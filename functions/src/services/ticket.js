@@ -49,10 +49,14 @@ function ticketId(random = randomBytes) {
   return `TKT-${random(10).toString('hex').toUpperCase()}`;
 }
 
+export function isPaidConfirmed(registration) {
+  return registration?.registrationStatus === REGISTRATION_STATUS.confirmed
+    && registration?.paymentStatus === PAYMENT_STATUS.paid;
+}
+
 function assertConfirmed(registration) {
   if (
-    registration.registrationStatus !== REGISTRATION_STATUS.confirmed
-    || registration.paymentStatus !== PAYMENT_STATUS.paid
+    !isPaidConfirmed(registration)
   ) {
     throw new AppError('TICKET_NOT_AVAILABLE', 'A ticket is available only after confirmed payment.', 409);
   }

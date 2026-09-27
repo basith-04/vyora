@@ -1,3 +1,4 @@
+import { createCompletionService } from './services/complete-registration.js';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret, defineString } from 'firebase-functions/params';
@@ -97,7 +98,7 @@ export const api = onRequest(
       emailApiKey,
     ],
   },
-  createApp({ checkoutService, paymentService, webhookService, ticketService, adminRouter, logger }),
+  createApp({ completionService: createCompletionService({ db }), checkoutService, paymentService, webhookService, ticketService, adminRouter, logger }),
 );
 
 export const expireReservations = onSchedule(

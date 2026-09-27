@@ -1,0 +1,6 @@
+.completion-container { max-width: 720px; }
+.completion-form { margin-top: 24px; }
+.completion-fields { margin: 0; }
+.completion-fields h2 { margin: 26px 0 0; font: 700 16px/1.5 var(--font-technical); }
+.completion-note { margin-top: 20px; }
+.completion-note textarea { width: 100%; resize: vertical; padding: 12px; border: 0; background: transparent; color: var(--vyora-ink); font: 500 16px/1.5 var(--font-technical); }

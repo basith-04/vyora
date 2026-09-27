@@ -47,3 +47,16 @@ export function filterRegistrations(registrations, search, filters) {
     return true;
   });
 }
+
+export function confirmedParticipantMatches(registrations, search) {
+  if (!search.trim()) return [];
+  const needle = search.trim().toLocaleLowerCase();
+  return filterRegistrations(registrations, search, defaultFilters)
+    .filter((item) => item.registrationStatus === 'CONFIRMED' && item.paymentStatus === 'PAID')
+    .sort((a, b) => Number(b.fullName.toLocaleLowerCase().includes(needle))
+      - Number(a.fullName.toLocaleLowerCase().includes(needle)));
+}
+
+export function canAccessAdminView(role, view) {
+  return !['tickets', 'edit-ticket', 'transfer-ticket', 'reconciliation', 'manual-ticket', 'ticket-email-resender'].includes(view) || role === 'ADMIN';
+}

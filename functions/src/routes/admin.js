@@ -76,11 +76,12 @@ export function createAdminRouter({
 
   router.get('/export/registrations.csv', async (request, response, next) => {
     try {
+      const csv = await reportingService.csv(request.query);
       response.set({
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': 'attachment; filename="vyora-26-registrations.csv"',
       });
-      response.status(200).send(`\uFEFF${await reportingService.csv(request.query)}`);
+      response.status(200).send(`\uFEFF${csv}`);
     } catch (error) {
       next(error);
     }

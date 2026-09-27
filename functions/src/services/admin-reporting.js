@@ -1,3 +1,5 @@
+import { matchesRegistrationFilters } from '../../shared/report-filters.js';
+import { CSV_FIELDS, DEFAULT_CSV_COLUMNS } from '../../shared/csv-fields.js';
 import { AppError } from '../errors.js';
 import { COLLECTIONS, SYSTEM_DOCUMENTS, WORKSHOP_IDS } from '../config/constants.js';
 import { createCsv } from '../utils/csv.js';
@@ -25,6 +27,9 @@ const EXPORT_FILTER_VALUES = Object.freeze({
   reconciliation: new Set(['true', 'false']),
   eventCheckin: new Set(['true', 'false']),
   workshopCheckin: new Set(['true', 'false']),
+  gender: new Set(['MALE', 'FEMALE', 'NOT_PROVIDED']),
+  foodPreference: new Set(['VEG', 'NON_VEG', 'NOT_PROVIDED']),
+  completionDetails: new Set(['COMPLETED', 'NOT_COMPLETED']),
 });
 
 export function normalizeExportFilters(input = {}) {
@@ -56,24 +61,7 @@ export function normalizeExportFilters(input = {}) {
 
 export function filterRegistrationsForExport(registrations, input = {}) {
   const filters = normalizeExportFilters(input);
-  const needle = filters.search.toLocaleLowerCase();
-  return registrations.filter((item) => {
-    if (needle && ![item.registrationId, item.fullName, item.email, item.phone, item.department, item.class]
-      .some((value) => String(value || '').toLocaleLowerCase().includes(needle))) return false;
-    if (filters.registrationStatus && item.registrationStatus !== filters.registrationStatus) return false;
-    if (filters.paymentStatus && item.paymentStatus !== filters.paymentStatus) return false;
-    if (filters.year && String(item.year) !== filters.year) return false;
-    if (filters.ieee && String(item.ieeeMember) !== filters.ieee) return false;
-    if (filters.workshopId && item.workshopId !== filters.workshopId) return false;
-    if (filters.hosteller && String(item.isHosteller) !== filters.hosteller) return false;
-    if (filters.hostel && item.hostel !== filters.hostel) return false;
-    if (filters.stay && String(item.needsStay) !== filters.stay) return false;
-    if (filters.stayType && item.stayType !== filters.stayType) return false;
-    if (filters.reconciliation && String(item.paymentReconciliationRequired) !== filters.reconciliation) return false;
-    if (filters.eventCheckin && String(Boolean(item.attendance?.event)) !== filters.eventCheckin) return false;
-    if (filters.workshopCheckin && String(Boolean(item.attendance?.workshop)) !== filters.workshopCheckin) return false;
-    return true;
-  });
+  return registrations.filter((item) => matchesRegistrationFilters(item, filters.search, filters));
 }
 
 function iso(value) {
@@ -142,6 +130,9 @@ export function publicRegistration(registration, payment = null, attendance = {}
     ieeeMember: registration.ieeeMember === true,
     ieeeMembershipId: registration.ieeeMembershipId || null,
     workshopId: registration.workshopId,
+    gender: registration.gender || null,
+    foodPreference: registration.foodPreference || null,
+    detailsCompletedAt: iso(registration.detailsCompletedAt),
     isHosteller: registration.isHosteller === true,
     hostel: registration.hostel || null,
     needsStay: registration.needsStay === true,
@@ -267,28 +258,58 @@ export function buildDashboard({ registrations, payments, capacity, workshops, c
   };
 }
 
-const CSV_HEADERS = [
-  'registrationId', 'fullName', 'email', 'phone', 'year', 'department', 'class', 'ieeeMember',
-  'ieeeMembershipId', 'workshop', 'isHosteller', 'hostel', 'needsStay', 'stayType',
-  'baseFee', 'stayFee', 'totalFee', 'paymentStatus', 'registrationStatus',
-  'razorpayOrderId', 'razorpayPaymentId', 'paymentReconciliationRequired',
-  'createdAt', 'confirmedAt', 'expiredAt', 'eventCheckedInAt', 'workshopCheckedInAt',
-];
+const CSV_VALUE = Object.freeze({
+  fullName: (item) => item.fullName,
+  email: (item) => item.email,
+  phone: (item) => item.phone,
+  year: (item) => item.year,
+  department: (item) => item.department,
+  class: (item) => item.class,
+  ieeeMember: (item) => item.ieeeMember ? 'IEEE' : 'Non-IEEE',
+  ieeeMembershipId: (item) => item.ieeeMembershipId,
+  workshop: (item) => WORKSHOP_NAMES[item.workshopId] || item.workshopId,
+  registrationId: (item) => item.registrationId,
+  registrationStatus: (item) => item.registrationStatus,
+  paymentStatus: (item) => item.paymentStatus,
+  isHosteller: (item) => item.isHosteller ? 'Hosteller' : 'Non-hosteller',
+  hostel: (item) => item.hostel,
+  needsStay: (item) => item.needsStay ? 'Needs Stay' : 'No Stay',
+  stayType: (item) => item.stayType,
+  gender: (item) => item.gender,
+  foodPreference: (item) => item.foodPreference,
+  detailsCompleted: (item) => item.detailsCompletedAt ? 'Completed' : 'Not Completed',
+  baseFee: (item) => item.baseFee,
+  stayFee: (item) => item.stayFee,
+  totalFee: (item) => item.totalFee,
+  paymentReconciliationRequired: (item) => item.paymentReconciliationRequired ? 'Required' : 'Not Required',
+  createdAt: (item) => item.createdAt,
+  confirmedAt: (item) => item.confirmedAt,
+  expiredAt: (item) => item.expiredAt,
+  eventCheckedInAt: (item) => item.attendance?.event?.checkedInAt,
+  workshopCheckedInAt: (item) => item.attendance?.workshop?.checkedInAt,
+});
 
-export function registrationsCsv(registrations) {
-  return createCsv(CSV_HEADERS, registrations.map((item) => [
-    item.registrationId, item.fullName, item.email, item.phone, item.year,
-    item.department, item.class,
-    item.ieeeMember ? 'IEEE' : 'Non-IEEE', item.ieeeMembershipId,
-    WORKSHOP_NAMES[item.workshopId] || item.workshopId,
-    item.isHosteller ? 'Hosteller' : 'Non-hosteller', item.hostel,
-    item.needsStay ? 'Needs Stay' : 'No Stay', item.stayType,
-    item.baseFee, item.stayFee, item.totalFee, item.paymentStatus,
-    item.registrationStatus, item.razorpayOrderId, item.razorpayPaymentId,
-    item.paymentReconciliationRequired ? 'Required' : 'Not Required',
-    item.createdAt, item.confirmedAt, item.expiredAt,
-    item.attendance?.event?.checkedInAt, item.attendance?.workshop?.checkedInAt,
-  ]));
+export function normalizeCsvColumns(value) {
+  if (value === undefined) return [...DEFAULT_CSV_COLUMNS];
+  if (typeof value !== 'string' || !value || value.length > 700) {
+    throw new AppError('INVALID_CSV_COLUMNS', 'Choose at least one valid CSV field.', 400);
+  }
+  const keys = value.split(',');
+  if (keys.length > CSV_FIELDS.length || new Set(keys).size !== keys.length
+    || keys.some((key) => !Object.hasOwn(CSV_VALUE, key))) {
+    throw new AppError('INVALID_CSV_COLUMNS', 'Choose only supported CSV fields.', 400);
+  }
+  return keys;
+}
+
+export function registrationsCsv(registrations, columns = DEFAULT_CSV_COLUMNS) {
+  const selected = typeof columns === 'string' ? normalizeCsvColumns(columns) : columns;
+  if (!Array.isArray(selected) || !selected.length || selected.some((key) => !Object.hasOwn(CSV_VALUE, key))) {
+    throw new AppError('INVALID_CSV_COLUMNS', 'Choose at least one valid CSV field.', 400);
+  }
+  const labels = new Map(CSV_FIELDS.map(({ key, label }) => [key, label]));
+  return createCsv(selected.map((key) => labels.get(key)),
+    registrations.map((item) => selected.map((key) => CSV_VALUE[key](item) ?? '')));
 }
 
 export function buildTicketsReport(tickets, registrations) {
@@ -371,9 +392,12 @@ export function createAdminReportingService({ db }) {
       return registration;
     },
 
-    async csv(filters = {}) {
+    async csv(input = {}) {
+      const { columns, ...filters } = input;
+      const selected = normalizeCsvColumns(columns);
+      const normalized = normalizeExportFilters(filters);
       const registrations = (await readRegistrationsAndPayments()).registrations;
-      return registrationsCsv(filterRegistrationsForExport(registrations, filters));
+      return registrationsCsv(filterRegistrationsForExport(registrations, normalized), selected);
     },
   };
 }

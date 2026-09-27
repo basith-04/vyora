@@ -16,7 +16,7 @@ export function createRecoveryToken() {
     .replace(/=+$/, '');
 }
 
-async function apiRequest(path, body, token) {
+async function apiRequest(path, body, token, raw = false) {
   let response;
   try {
     response = await fetch(path, {
@@ -36,6 +36,7 @@ async function apiRequest(path, body, token) {
   } catch {
     throw new RegistrationApiError('INVALID_RESPONSE', 'The server returned an invalid response.', response.status);
   }
+  if (raw) return payload;
   if (!response.ok) {
     throw new RegistrationApiError(
       payload?.error?.code ?? 'REQUEST_FAILED',
@@ -47,6 +48,7 @@ async function apiRequest(path, body, token) {
 }
 
 export const registrationApi = {
+  complete: (values) => apiRequest('/api/complete-registration', values, undefined, true),
   create: (participant, token) => apiRequest('/api/registrations', participant, token),
   retry: (registrationId, token) => apiRequest('/api/registrations/retry', { registrationId }, token),
   status: (registrationId, token) => apiRequest('/api/registrations/status', { registrationId }, token),

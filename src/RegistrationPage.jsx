@@ -1,3 +1,4 @@
+import { FieldError, TextField, YesNoChoice } from './RegistrationControls.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { departmentClasses, hostels, workshops, years } from './registrationOptions.js';
 import {
@@ -34,10 +35,6 @@ function SectionHeading({ number, title, copy }) {
   return <div className="registration-section-heading"><span className="registration-section-index">{number} /</span><div><h2 id={ids[number]}>{title}</h2><p>{copy}</p></div></div>;
 }
 
-function FieldError({ id, error }) {
-  return error ? <p className="registration-error" id={id} role="alert"><span aria-hidden="true">!</span> {error}</p> : null;
-}
-
 function Progress({ current, complete }) {
   return <ol className="registration-progress" aria-label="Registration progress">{steps.map((step, index) => {
     const state = complete[index] ? 'done' : index === current ? 'current' : 'upcoming';
@@ -45,17 +42,8 @@ function Progress({ current, complete }) {
   })}</ol>;
 }
 
-function TextField({ field, label, placeholder, type = 'text', value, onChange, onBlur, error, inputRef, autoComplete, inputMode, prefix }) {
-  const errorId = `${field}-error`;
-  return <div className="registration-field"><label htmlFor={field}>{label} <span aria-hidden="true">*</span></label><div className={`registration-input-wrap${prefix ? ' has-prefix' : ''}`}>{prefix && <span className="registration-input-prefix" aria-hidden="true">{prefix}</span>}<input ref={inputRef} id={field} name={field} type={type} placeholder={placeholder} value={value ?? ''} onChange={onChange} onBlur={onBlur} autoComplete={autoComplete} inputMode={inputMode} required aria-invalid={!!error} aria-describedby={error ? errorId : undefined} /></div><FieldError id={errorId} error={error} /></div>;
-}
-
 function RegistrationHero() {
   return <div className="registration-hero"><span className="registration-exe">// REGISTRATION.EXE<br />PARTICIPANT INITIALIZATION</span><h1>INITIALIZE<br /><span>YOUR ENTRY.</span></h1><p>COMPLETE YOUR DETAILS.<br />CHOOSE YOUR AIDEXX PATH.<br />REVIEW YOUR FEE.</p><span className="registration-hero-mark" aria-hidden="true">+</span></div>;
-}
-
-function YesNoChoice({ field, legend, value, onChange, onBlur, error, inputRef }) {
-  return <fieldset className="registration-choice-fieldset"><legend>{legend} <span aria-hidden="true">*</span></legend><div className="registration-ieee-grid">{[{ label: 'YES', value: true }, { label: 'NO', value: false }].map((option, index) => <label className={`registration-ieee-option registration-accommodation-option${value === option.value ? ' is-selected' : ''}`} key={option.label}><input ref={index === 0 ? inputRef : undefined} type="radio" name={field} required value={option.label} checked={value === option.value} onChange={() => onChange(field, option.value)} onBlur={() => onBlur(field)} aria-invalid={!!error} aria-describedby={error ? `${field}-error` : undefined} /><span className="registration-radio-mark" aria-hidden="true" /><strong>{option.label}</strong></label>)}</div><FieldError id={`${field}-error`} error={error} /></fieldset>;
 }
 
 function AccommodationFields({ form, update, blur, errorFor, refs }) {

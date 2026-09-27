@@ -128,3 +128,17 @@ test('ticket email resend sends only selected registration and stable request ke
     assert.deepEqual(paths, ['/api/admin/registrations/VYR26-SELECTED/ticket-email', '/api/admin/registrations/VYR26-SELECTED/ticket-email/resend']);
   } finally { globalThis.fetch = original; }
 });
+
+
+test('CSV export passes selected columns alongside active completion filters', async (context) => {
+  context.mock.method(globalThis, 'fetch', async (path) => {
+    const url = new URL(path, 'https://vyora.example');
+    assert.equal(url.pathname, '/api/admin/export/registrations.csv');
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+      search: 'Devika', workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', completionDetails: 'COMPLETED',
+      columns: 'fullName,email,phone,foodPreference',
+    });
+    return new Response('"Name"', { status: 200, headers: { 'Content-Type': 'text/csv' } });
+  });
+  await downloadRegistrationsCsv(auth(), 'Devika', { workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', completionDetails: 'COMPLETED' }, ['fullName', 'email', 'phone', 'foodPreference']);
+});

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultFilters, filterRegistrations, hostelLabels, readableStatus } from './adminData.js';
+import { CSV_FIELDS, DEFAULT_CSV_COLUMNS, ALL_CSV_COLUMNS, toggleCsvColumn, allCsvColumnsSelected } from '../functions/shared/csv-fields.js';
 import { loginAdmin, logoutAdmin, observeAdmin } from './adminAuth.js';
 
 const registrations = [
@@ -59,4 +60,36 @@ test('ticket email resender reuses confirmed name search and is ADMIN only', asy
   assert.deepEqual(confirmedParticipantMatches(records, 'Suresh').map((item) => item.email), ['first@example.com']);
   assert.equal(canAccessAdminView('ADMIN', 'ticket-email-resender'), true);
   assert.equal(canAccessAdminView('COORDINATOR', 'ticket-email-resender'), false);
+});
+
+test('completion filters cover every option and compose with existing filters', () => {
+  const records = [
+    { registrationId: 'A', fullName: 'Devika', year: 2, workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', detailsCompletedAt: '2026-09-28T00:00:00Z' },
+    { registrationId: 'B', fullName: 'Rahul', year: 2, workshopId: 'github-ai', gender: 'MALE', foodPreference: 'NON_VEG', detailsCompletedAt: '2026-09-28T00:00:00Z' },
+    { registrationId: 'C', fullName: 'Legacy', year: 2, workshopId: 'github-ai' },
+    { registrationId: 'D', fullName: 'Partial', year: 2, workshopId: 'github-ai', gender: null, foodPreference: '' },
+    { registrationId: 'E', fullName: 'Devika Other', year: 1, workshopId: 'data-science', gender: 'FEMALE', foodPreference: 'VEG', detailsCompletedAt: '2026-09-28T00:00:00Z' },
+  ];
+  const ids = (extra, search = '') => filterRegistrations(records, search, { ...defaultFilters, ...extra }).map((item) => item.registrationId);
+  assert.deepEqual(ids({ gender: '' }), ['A', 'B', 'C', 'D', 'E']);
+  assert.deepEqual(ids({ gender: 'MALE' }), ['B']);
+  assert.deepEqual(ids({ gender: 'FEMALE' }), ['A', 'E']);
+  assert.deepEqual(ids({ gender: 'NOT_PROVIDED' }), ['C', 'D']);
+  assert.deepEqual(ids({ foodPreference: '' }), ['A', 'B', 'C', 'D', 'E']);
+  assert.deepEqual(ids({ foodPreference: 'VEG' }), ['A', 'E']);
+  assert.deepEqual(ids({ foodPreference: 'NON_VEG' }), ['B']);
+  assert.deepEqual(ids({ foodPreference: 'NOT_PROVIDED' }), ['C', 'D']);
+  assert.deepEqual(ids({ completionDetails: '' }), ['A', 'B', 'C', 'D', 'E']);
+  assert.deepEqual(ids({ completionDetails: 'COMPLETED' }), ['A', 'B', 'E']);
+  assert.deepEqual(ids({ completionDetails: 'NOT_COMPLETED' }), ['C', 'D']);
+  assert.deepEqual(ids({ gender: 'FEMALE', foodPreference: 'VEG', completionDetails: 'COMPLETED', workshopId: 'github-ai', year: '2' }, 'Devika'), ['A']);
+  assert.deepEqual(ids({ year: '2', completionDetails: 'NOT_COMPLETED' }), ['C', 'D']);
+  assert.deepEqual(DEFAULT_CSV_COLUMNS, ['fullName', 'email', 'phone', 'year', 'workshop']);
+  assert.equal(ALL_CSV_COLUMNS.length, CSV_FIELDS.length);
+  assert.equal(allCsvColumnsSelected(ALL_CSV_COLUMNS), true);
+  const removed = toggleCsvColumn(ALL_CSV_COLUMNS, 'gender');
+  assert.equal(allCsvColumnsSelected(removed), false);
+  assert.equal(toggleCsvColumn(removed, 'gender').length, ALL_CSV_COLUMNS.length);
+  assert.deepEqual(toggleCsvColumn([], 'unsafe'), []);
+  assert.equal(CSV_FIELDS.some((field) => /health|token|hash/i.test(field.key)), false);
 });

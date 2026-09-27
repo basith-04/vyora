@@ -1,3 +1,4 @@
+import { ALL_CSV_COLUMNS } from '../../shared/csv-fields.js';
 import test, { after, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
@@ -245,12 +246,11 @@ test('CSV export requires authorization and neutralizes participant formulas', a
   assert.equal((await request(app).get('/api/admin/export/registrations.csv')).status, 401);
   const { user, token } = await createIdentity('export@example.com');
   await db.doc(`admins/${user.uid}`).set({ name: 'Export Admin', email: user.email, role: 'ADMIN', active: true });
-  const response = await request(app).get('/api/admin/export/registrations.csv').set('Authorization', `Bearer ${token}`);
+  const response = await request(app).get('/api/admin/export/registrations.csv?columns=registrationId,fullName,email,phone,year,department,class,ieeeMember').set('Authorization', `Bearer ${token}`);
   assert.equal(response.status, 200);
   assert.match(response.headers['content-type'], /text\/csv/);
   assert.match(response.headers['content-disposition'], /attachment/);
-  assert.match(response.text, /"registrationId","fullName"/);
-  assert.match(response.text, /"year","department","class","ieeeMember"/);
+  assert.match(response.text, /"Registration ID","Name","Email","Phone","Year","Department","Class","IEEE Member"/);
   assert.match(response.text, /"CSE","CSE A"/);
   assert.match(response.text, /"'@Formula"/);
   assert.match(response.text, /"Admin, Test"/);
@@ -321,4 +321,38 @@ test('manual payment reconciliation requires an active ADMIN and rejects COORDIN
   assert.equal(allowed.status, 200);
   assert.equal(allowed.body.data.outcome, 'CONFIRMED');
   assert.equal(allowed.body.data.reconciledBy, administrator.user.uid);
+});
+
+
+test('CSV export composes completion filters with selected columns across every matching registration', async () => {
+  const { user, token } = await createIdentity('selective-export@example.com');
+  await db.doc(`admins/${user.uid}`).set({ name: 'Export Staff', email: user.email, role: 'COORDINATOR', active: true });
+  const now = Timestamp.fromDate(new Date('2026-09-28T09:00:00.000Z'));
+  await db.doc('registrations/reg-1').update({ gender: 'FEMALE', foodPreference: 'VEG', detailsCompletedAt: now,
+    healthSafetyConcern: true, healthSafetyNote: 'PRIVATE_MEDICAL' });
+  await db.doc('registrations/reg-3').set({ registrationId: 'VYR26-ADMIN-3', fullName: 'Third Person', email: 'third@example.com', phone: '9876543212',
+    year: 1, workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', detailsCompletedAt: now,
+    healthSafetyNote: 'PRIVATE_MEDICAL', createdAt: now });
+  const path = '/api/admin/export/registrations.csv?year=1&workshopId=github-ai&gender=FEMALE&foodPreference=VEG&completionDetails=COMPLETED&columns=fullName,email,phone,foodPreference';
+  const selected = await request(app).get(path).set('Authorization', `Bearer ${token}`);
+  assert.equal(selected.status, 200);
+  assert.equal(selected.text.replace(/^\uFEFF/, '').split('\r\n').length, 3);
+  assert.match(selected.text, /^\uFEFF"Name","Email","Phone","Food Preference"/);
+  assert.match(selected.text, /"Admin, Test"/);
+  assert.match(selected.text, /"Third Person"/);
+  assert.doesNotMatch(selected.text, /"@Formula"/);
+  assert.doesNotMatch(selected.text, /PRIVATE_MEDICAL/);
+  const missing = await request(app).get('/api/admin/export/registrations.csv?gender=NOT_PROVIDED&foodPreference=NOT_PROVIDED&completionDetails=NOT_COMPLETED&columns=fullName,gender,foodPreference').set('Authorization', `Bearer ${token}`);
+  assert.equal(missing.status, 200);
+  assert.match(missing.text, /"'@Formula","",""/);
+  assert.doesNotMatch(missing.text, /"Admin, Test"/);
+  for (const unsafe of ['healthSafetyNote', 'recoveryTokenHash', 'gender,healthSafetyNote', '']) {
+    const result = await request(app).get(`/api/admin/export/registrations.csv?columns=${unsafe}`).set('Authorization', `Bearer ${token}`);
+    assert.equal(result.status, 400);
+    assert.equal(result.body.error.code, 'INVALID_CSV_COLUMNS');
+  }
+  const all = await request(app).get(`/api/admin/export/registrations.csv?columns=${ALL_CSV_COLUMNS.join(',')}`).set('Authorization', `Bearer ${token}`);
+  assert.equal(all.status, 200);
+  assert.doesNotMatch(all.text, /PRIVATE_MEDICAL|healthSafetyNote|recoveryTokenHash/);
+  assert.equal((await request(app).get(path)).status, 401);
 });

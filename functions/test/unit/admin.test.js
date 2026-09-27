@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { ALL_CSV_COLUMNS } from '../../shared/csv-fields.js';
 import request from 'supertest';
 import { createAdminAuthorization } from '../../src/middleware/admin-auth.js';
 import { createAdminRouter } from '../../src/routes/admin.js';
 import {
-  buildDashboard, buildTicketsReport, filterRegistrationsForExport, publicRegistration, registrationsCsv,
+  buildDashboard, buildTicketsReport, filterRegistrationsForExport, publicRegistration, registrationsCsv, normalizeCsvColumns,
 } from '../../src/services/admin-reporting.js';
 
 function fakeDb(profile) {
@@ -187,9 +188,9 @@ test('CSV uses expected columns, escapes values and neutralizes spreadsheet form
     totalFee: 399, paymentStatus: 'PENDING', registrationStatus: 'PAYMENT_PENDING',
     razorpayOrderId: null, razorpayPaymentId: null, paymentReconciliationRequired: false,
     createdAt: '2026-09-19T00:00:00.000Z', confirmedAt: null, expiredAt: null,
-  }]);
-  assert.match(csv, /^"registrationId","fullName"/);
-  assert.match(csv, /"year","department","class","ieeeMember"/);
+  }], ['registrationId', 'fullName', 'email', 'phone', 'year', 'department', 'class', 'ieeeMember', 'ieeeMembershipId', 'hostel']);
+  assert.match(csv, /^"Registration ID","Name"/);
+  assert.match(csv, /"Year","Department","Class","IEEE Member"/);
   assert.match(csv, /"ADS","ADS B"/);
   assert.match(csv, /"PG_HOUSE_NEAR_COLLEGE"/);
   assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
@@ -283,4 +284,39 @@ test('ticket email lookup and resend require active ADMIN and return only safe r
   assert.deepEqual(Object.keys(detail.body.data).sort(), ['email', 'fullName', 'registrationId', 'ticketId']);
   const sent = await request(app).post(`${path}/resend`).set('Authorization', 'Bearer valid').send({ requestId: 'request-key' });
   assert.deepEqual(sent.body, { data: { outcome: 'SENT' } });
+});
+
+test('new completion filters use missing-safe semantics and compose server-side', () => {
+  const registrations = [
+    { registrationId: 'A', fullName: 'Devika', year: 2, workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', detailsCompletedAt: '2026-09-28' },
+    { registrationId: 'B', fullName: 'Rahul', year: 2, workshopId: 'github-ai', gender: 'MALE', foodPreference: 'NON_VEG', detailsCompletedAt: '2026-09-28' },
+    { registrationId: 'C', fullName: 'Legacy', year: 2, workshopId: 'github-ai' },
+    { registrationId: 'D', fullName: 'Partial', year: 2, workshopId: 'github-ai', gender: null, foodPreference: '' },
+  ];
+  const ids = (filters) => filterRegistrationsForExport(registrations, filters).map((item) => item.registrationId);
+  for (const [key, values] of Object.entries({
+    gender: { MALE: ['B'], FEMALE: ['A'], NOT_PROVIDED: ['C', 'D'] },
+    foodPreference: { VEG: ['A'], NON_VEG: ['B'], NOT_PROVIDED: ['C', 'D'] },
+    completionDetails: { COMPLETED: ['A', 'B'], NOT_COMPLETED: ['C', 'D'] },
+  })) {
+    assert.deepEqual(ids({ [key]: '' }), ['A', 'B', 'C', 'D']);
+    for (const [value, expected] of Object.entries(values)) assert.deepEqual(ids({ [key]: value }), expected);
+  }
+  assert.deepEqual(ids({ search: 'Devika', year: '2', workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', completionDetails: 'COMPLETED' }), ['A']);
+  assert.deepEqual(ids({ year: '2', completionDetails: 'NOT_COMPLETED' }), ['C', 'D']);
+});
+
+test('CSV selected columns are allowlisted, missing cells are empty, and health and security data never export', () => {
+  const raw = { fullName: '=HYPERLINK("bad")', gender: 'FEMALE', foodPreference: 'VEG', healthSafetyNote: 'PRIVATE', recoveryTokenHash: 'SECRET', email: 'a,b@example.com' };
+  const older = { fullName: 'Older', gender: null, healthSafetyNote: 'PRIVATE2' };
+  const fields = 'fullName,email,gender,foodPreference';
+  assert.deepEqual(normalizeCsvColumns(fields), fields.split(','));
+  assert.equal(registrationsCsv([raw, older], fields), '"Name","Email","Gender","Food Preference"\r\n"\'=HYPERLINK(""bad"")","a,b@example.com","FEMALE","VEG"\r\n"Older","","",""');
+  for (const value of ['', 'healthSafetyNote', 'recoveryTokenHash', 'fullName,healthSafetyNote', 'fullName,fullName', ['fullName'], 'fullName,,email']) {
+    assert.throws(() => normalizeCsvColumns(value), { code: 'INVALID_CSV_COLUMNS' });
+  }
+  const all = registrationsCsv([raw], ALL_CSV_COLUMNS);
+  assert.equal(all.includes('PRIVATE'), false);
+  assert.equal(all.includes('SECRET'), false);
+  assert.equal(all.includes('[object Object]'), false);
 });

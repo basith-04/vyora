@@ -83,3 +83,8 @@ export const reconcilePayment = (auth, registrationId) => adminRequest(
   `/api/admin/registrations/${encodeURIComponent(registrationId)}/reconcile-payment`,
   { method: 'POST' },
 );
+
+export const loadTicketEmail = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}/ticket-email`);
+export const resendTicketEmail = (auth, id, requestId) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}/ticket-email/resend`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId }),
+});

@@ -11,7 +11,7 @@ const messages = {
   RATE_LIMITED: 'Too many attempts. Please try again later.',
 };
 export default function CompleteRegistrationPage() {
-  const [form, setForm] = useState({ registrationId: '', gender: '', foodPreference: '', healthSafetyConcern: null, healthSafetyNote: '' });
+  const [form, setForm] = useState({ registrationId: '', gender: '', foodPreference: '', healthSafetyConcern: null, healthSafetyNote: '', termsAccepted: false });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -30,8 +30,8 @@ export default function CompleteRegistrationPage() {
     if (Object.keys(fields).length) return;
     submitting.current = true; setBusy(true); setMessage('');
     try {
-      const result = await registrationApi.complete({ ...form, healthSafetyNote: form.healthSafetyConcern ? form.healthSafetyNote : null });
-      if (result.success === true) { setSuccess(true); setForm({ registrationId: '', gender: '', foodPreference: '', healthSafetyConcern: null, healthSafetyNote: '' }); }
+      const result = await registrationApi.complete({ ...form, registrationId: form.registrationId.trim(), healthSafetyNote: form.healthSafetyConcern ? form.healthSafetyNote : null });
+      if (result.success === true) { setSuccess(true); setForm({ registrationId: '', gender: '', foodPreference: '', healthSafetyConcern: null, healthSafetyNote: '', termsAccepted: false }); }
       else if (result.code === 'INVALID_COMPLETION' && result.fields) setErrors(result.fields);
       else setMessage(messages[result.code] || 'Unable to submit details. Please try again.');
     } catch { setMessage('Unable to submit details. Please try again.'); }
@@ -48,6 +48,10 @@ export default function CompleteRegistrationPage() {
         <RadioChoice field="healthSafetyConcern" legend="Do you have any health condition, medication requirement, allergy, or other concern we should know about for trekking/outdoor activities?" options={[{ label: 'No', value: false }, { label: 'Yes', value: true }]} value={form.healthSafetyConcern} onChange={update} error={errors.healthSafetyConcern} />
         {form.healthSafetyConcern === true && <div className="registration-field completion-note"><label htmlFor="healthSafetyNote">Please briefly mention anything the organizers should know to assist you if needed:</label><div className="registration-input-wrap"><textarea id="healthSafetyNote" name="healthSafetyNote" rows={3} required maxLength={HEALTH_NOTE_MAX_LENGTH} value={form.healthSafetyNote} onChange={(e) => update('healthSafetyNote', e.target.value)} aria-invalid={!!errors.healthSafetyNote} aria-describedby="healthSafetyNote-error" /></div><FieldError id="healthSafetyNote-error" error={errors.healthSafetyNote} /></div>}
         <p className="registration-payment-note">This information is collected only to help the organizing team plan appropriate assistance and respond to emergencies during the event.</p>
+        <div className="completion-terms">
+          <label className="registration-payment-note" htmlFor="termsAccepted"><input id="termsAccepted" name="termsAccepted" type="checkbox" required checked={form.termsAccepted} onChange={(e) => update('termsAccepted', e.target.checked)} aria-invalid={!!errors.termsAccepted} aria-describedby={errors.termsAccepted ? 'termsAccepted-error' : undefined} /><span>I have read and accept the <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>.</span></label>
+          <FieldError id="termsAccepted-error" error={errors.termsAccepted} />
+        </div>
         <button className="registration-submit" type="submit" disabled={busy}>{busy ? 'SUBMITTING...' : 'SUBMIT'} <span aria-hidden="true">→</span></button>
       </fieldset>
       {message && <p className="registration-error" role="alert">{message}</p>}

@@ -8,7 +8,7 @@ export function registrationHasRecoveryToken(registration, recoveryTokenHash) {
 }
 
 export async function findRegistrationByPublicId(db, registrationId) {
-  if (typeof registrationId !== 'string' || !/^VYR26-[A-Z0-9]{20}$/.test(registrationId)) {
+  if (typeof registrationId !== 'string' || !/^VYR26-(?:[A-Z0-9]{20}|[A-F0-9]{32})$/.test(registrationId)) {
     throw new AppError('REGISTRATION_NOT_FOUND', 'The registration could not be found.', 404);
   }
   const snapshot = await db.collection(COLLECTIONS.registrations)

@@ -5,6 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { createCompletionService } from '../../src/services/complete-registration.js';
 import { createTicketService } from '../../src/services/ticket.js';
 const registrationId = 'VYR26-ABCDEFGHIJKLMNOPQRST';
+const manualRegistrationId = 'VYR26-0123456789ABCDEF0123456789ABCDEF';
 const input = { registrationId, termsAccepted: true, gender: 'MALE', foodPreference: 'VEG', healthSafetyConcern: true, healthSafetyNote: 'Need assistance' };
 let app, db, service, ref;
 before(() => { app = initializeApp({ projectId: 'demo-vyora-26' }, 'completion-tests'); db = getFirestore(app); service = createCompletionService({ db }); ref = db.doc('registrations/internal-completion-id'); });
@@ -26,6 +27,40 @@ test('unknown and every invalid payment/status combination give the same minimal
     await ref.set({ registrationId, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ...state });
     assert.deepEqual(await service.submit(input), rejected);
     assert.equal((await ref.get()).data().gender, undefined);
+  }
+});
+test('32-character manual paid confirmed registration completes without Razorpay records and remains write once', async () => {
+  await ref.update({ registrationId: manualRegistrationId, razorpayOrderId: null, razorpayPaymentId: null });
+  const before = (await ref.get()).data();
+  const manualInput = { ...input, registrationId: manualRegistrationId };
+  assert.deepEqual(await service.submit(manualInput), { success: true });
+  const saved = (await ref.get()).data();
+  assert.equal(saved.gender, input.gender);
+  assert.equal(saved.termsAccepted, true);
+  assert.ok(saved.detailsCompletedAt);
+  for (const [key, value] of Object.entries(before)) assert.deepEqual(saved[key], value);
+  assert.deepEqual(await service.submit({ ...manualInput, gender: 'FEMALE' }), { success: false, code: 'ALREADY_COMPLETED' });
+  assert.deepEqual((await ref.get()).data(), saved);
+});
+test('32-character manual IDs do not bypass payment, confirmation, cancellation or reconciliation checks', async () => {
+  for (const state of [{ paymentStatus: 'PENDING' }, { registrationStatus: 'PAYMENT_PENDING' }, { registrationStatus: 'EXPIRED', paymentStatus: 'PAID' }, { registrationStatus: 'CANCELLED' }, { paymentReconciliationRequired: true }, { cancelledAt: 'cancelled' }]) {
+    const before = { registrationId: manualRegistrationId, paymentMethod: 'MANUAL', registrationStatus: 'CONFIRMED', paymentStatus: 'PAID', ...state };
+    await ref.set(before);
+    assert.deepEqual(await service.submit({ ...input, registrationId: manualRegistrationId }), { success: false, code: 'REGISTRATION_NOT_FOUND' });
+    assert.deepEqual((await ref.get()).data(), before);
+  }
+});
+test('malformed public IDs are rejected even when a paid confirmed matching registration exists', async () => {
+  for (const invalidId of [
+    `VYR26-${'A'.repeat(19)}`, `VYR26-${'A'.repeat(21)}`,
+    `VYR26-${'A'.repeat(31)}`, `VYR26-${'A'.repeat(33)}`,
+    `VYR26-${'G'.repeat(32)}`, `VYR26-${'A'.repeat(19)}-`,
+    `VYR26-${'A'.repeat(31)}_`, `VYR27-${'A'.repeat(20)}`,
+  ]) {
+    const before = { registrationId: invalidId, registrationStatus: 'CONFIRMED', paymentStatus: 'PAID' };
+    await ref.set(before);
+    assert.deepEqual(await service.submit({ ...input, registrationId: invalidId }), { success: false, code: 'REGISTRATION_NOT_FOUND' });
+    assert.deepEqual((await ref.get()).data(), before);
   }
 });
 test('NO discards text; arbitrary protected fields are rejected without writing', async () => {

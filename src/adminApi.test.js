@@ -142,3 +142,42 @@ test('CSV export passes selected columns alongside active completion filters', a
   });
   await downloadRegistrationsCsv(auth(), 'Devika', { workshopId: 'github-ai', gender: 'FEMALE', foodPreference: 'VEG', completionDetails: 'COMPLETED' }, ['fullName', 'email', 'phone', 'foodPreference']);
 });
+
+test('check-in deadline bounds hung network and late successful responses are never accepted', async (context) => {
+  const { submitCheckin } = await import('./adminApi.js');
+  let calls = 0; let signal; let respond;
+  context.mock.method(globalThis, 'fetch', async (path, options) => {
+    calls++; signal = options.signal;
+    return new Promise((resolve) => { respond = resolve; });
+  });
+  const input = { ticketToken: 'opaque-test-token', type: 'EVENT' };
+  await assert.rejects(submitCheckin(auth(), input, { timeoutMs: 10 }), { code: 'CHECKIN_TIMEOUT' });
+  assert.equal(calls, 1); assert.equal(signal.aborted, true);
+  respond(new Response(JSON.stringify({ data: { outcome: 'CHECKED_IN' } }), { status: 200 }));
+});
+
+test('check-in deadline also bounds auth and prevents a delayed request after timeout', async (context) => {
+  const { submitCheckin } = await import('./adminApi.js');
+  let calls = 0; let releaseToken;
+  const session = { currentUser: { getIdToken: () => new Promise((resolve) => { releaseToken = resolve; }) } };
+  context.mock.method(globalThis, 'fetch', async () => { calls++; return new Response('{}'); });
+  await assert.rejects(submitCheckin(session, { ticketToken: 'token', type: 'EVENT' }, { timeoutMs: 10 }), { code: 'CHECKIN_TIMEOUT' });
+  releaseToken('late-auth-token');
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(calls, 0);
+});
+
+test('check-in never reports success for network, backend or malformed-response failures and does not auto-retry', async (context) => {
+  const { submitCheckin } = await import('./adminApi.js');
+  let calls = 0;
+  const input = { ticketToken: 'test', type: 'EVENT' };
+  context.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('network'); });
+  await assert.rejects(submitCheckin(auth(), input), { code: 'NETWORK_ERROR' });
+  assert.equal(calls, 1);
+  context.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'Try again.' } }), { status: 500 }));
+  await assert.rejects(submitCheckin(auth(), input), { code: 'INTERNAL_ERROR' });
+  for (const body of ['{}', '{"data":{"outcome":"unknown"}}', 'invalid-json']) {
+    context.mock.method(globalThis, 'fetch', async () => new Response(body, { status: 200 }));
+    await assert.rejects(submitCheckin(auth(), input), { code: 'INVALID_RESPONSE' });
+  }
+});

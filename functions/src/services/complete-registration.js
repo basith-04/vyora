@@ -5,17 +5,18 @@ import { findRegistrationByPublicId } from './registration-access.js';
 import { isPaidConfirmed } from './ticket.js';
 import { completionErrors } from '../../shared/completion.js';
 
-const FIELDS = ['gender', 'foodPreference', 'healthSafetyConcern', 'healthSafetyNote', 'detailsCompletedAt'];
+const FIELDS = ['gender', 'foodPreference', 'healthSafetyConcern', 'healthSafetyNote', 'detailsCompletedAt', 'termsAccepted', 'termsAcceptedAt'];
+const INPUT_FIELDS = ['registrationId', 'gender', 'foodPreference', 'healthSafetyConcern', 'healthSafetyNote', 'termsAccepted'];
 const NOT_FOUND = { success: false, code: 'REGISTRATION_NOT_FOUND' };
 export function validateCompletion(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)
-    || Object.keys(input).some((key) => !['registrationId', ...FIELDS.slice(0, 4)].includes(key))) {
+    || Object.keys(input).some((key) => !INPUT_FIELDS.includes(key))) {
     throw new AppError('INVALID_COMPLETION', 'The form contains unsupported fields.', 400);
   }
   const fields = completionErrors(input);
   if (Object.keys(fields).length) throw new AppError('INVALID_COMPLETION', 'Please check the form.', 400, { fields });
   return { gender: input.gender, foodPreference: input.foodPreference,
-    healthSafetyConcern: input.healthSafetyConcern,
+    termsAccepted: true, healthSafetyConcern: input.healthSafetyConcern,
     healthSafetyNote: input.healthSafetyConcern ? input.healthSafetyNote.trim() : null };
 }
 
@@ -48,7 +49,8 @@ export function createCompletionService({ db, clock = () => Date.now() }) {
       if (!isPaidConfirmed(current) || current.paymentReconciliationRequired === true || current.cancelledAt) return NOT_FOUND;
       // Preserve even partially populated information from any other flow.
       if (FIELDS.some((field) => Object.hasOwn(current, field))) return { success: false, code: 'ALREADY_COMPLETED' };
-      tx.update(ref, { ...values, detailsCompletedAt: Timestamp.fromMillis(clock()) });
+      const completedAt = Timestamp.fromMillis(clock());
+      tx.update(ref, { ...values, detailsCompletedAt: completedAt, termsAcceptedAt: completedAt });
       return { success: true };
     });
   }

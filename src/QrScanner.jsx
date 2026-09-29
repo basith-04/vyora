@@ -1,3 +1,4 @@
+import { createScanGate } from './checkinUi.js';
 import React, { useEffect, useRef, useState } from 'react';
 
 function cameraMessage(error) {
@@ -10,6 +11,7 @@ function cameraMessage(error) {
 export default function QrScanner({ active, restartKey, onDetected }) {
   const videoRef = useRef(null);
   const [error, setError] = useState('');
+  const [cameraRetry, setCameraRetry] = useState(0);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -19,7 +21,7 @@ export default function QrScanner({ active, restartKey, onDetected }) {
     }
     let cancelled = false;
     let controls;
-    let handled = false;
+    const gate = createScanGate();
     setError('');
     import('@zxing/browser').then(({ BrowserQRCodeReader }) => {
       if (cancelled) return null;
@@ -28,8 +30,7 @@ export default function QrScanner({ active, restartKey, onDetected }) {
         { video: { facingMode: { ideal: 'environment' } }, audio: false },
         videoRef.current,
         (result, scanError, scannerControls) => {
-          if (!result || handled || cancelled) return;
-          handled = true;
+          if (!result || cancelled || !gate.claim()) return;
           scannerControls.stop();
           onDetected(result.getText());
         },
@@ -40,7 +41,7 @@ export default function QrScanner({ active, restartKey, onDetected }) {
       cancelled = true;
       controls?.stop();
     };
-  }, [active, restartKey, onDetected]);
+  }, [active, restartKey, onDetected, cameraRetry]);
 
-  return <div className="qr-scanner"><div className="scanner-viewport"><video ref={videoRef} muted playsInline aria-label="QR scanner camera preview" /><span className="scanner-frame" aria-hidden="true" /></div>{error && <div className="scanner-error" role="alert">{error}</div>}</div>;
+  return <div className="qr-scanner"><div className="scanner-viewport"><video ref={videoRef} muted playsInline aria-label="QR scanner camera preview" /><span className="scanner-frame" aria-hidden="true" /></div>{error && <div className="scanner-error" role="alert">{error}<button type="button" onClick={() => setCameraRetry((value) => value + 1)}>RETRY CAMERA</button></div>}</div>;
 }

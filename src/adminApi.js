@@ -11,7 +11,9 @@ export class AdminApiError extends Error {
 async function authorizedFetch(auth, path, options = {}, forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new AdminApiError('ADMIN_AUTH_REQUIRED', 'Your staff session has ended.', 401);
+  options.signal?.throwIfAborted();
   const token = await user.getIdToken(forceRefresh);
+  options.signal?.throwIfAborted();
   try {
     return await fetch(path, {
       ...options,
@@ -69,11 +71,30 @@ export function downloadRegistrationsCsv(auth, search = '', filters = {}, column
   const suffix = query.size ? `?${query.toString()}` : '';
   return adminRequest(auth, `/api/admin/export/registrations.csv${suffix}`, { responseType: 'blob' });
 }
-export const submitCheckin = (auth, input) => adminRequest(auth, '/api/admin/check-ins', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(input),
-});
+export async function submitCheckin(auth, input, { timeoutMs = 20_000 } = {}) {
+  const controller = new AbortController();
+  let timer;
+  const deadline = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new AdminApiError('CHECKIN_TIMEOUT', 'The request timed out. Check-in may have been recorded. Retry this ticket to confirm.', 0));
+      controller.abort();
+    }, timeoutMs);
+  });
+  try {
+    const data = await Promise.race([adminRequest(auth, '/api/admin/check-ins', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input), signal: controller.signal,
+    }), deadline]);
+    if (!['CHECKED_IN', 'ALREADY_CHECKED_IN'].includes(data?.outcome)) {
+      throw new AdminApiError('INVALID_RESPONSE', 'Check-in could not be confirmed. Retry this ticket.', 0);
+    }
+    return data;
+  } catch (error) {
+    if (error.code === 'NETWORK_ERROR') error.message = 'Connection lost. Check-in may have been recorded. Retry this ticket to confirm.';
+    if (!error.code) throw new AdminApiError('INVALID_RESPONSE', 'Check-in could not be confirmed. Retry this ticket.', 0);
+    throw error;
+  } finally { clearTimeout(timer); }
+}
 export const retryConfirmationEmail = (auth, registrationId) => adminRequest(
   auth,
   `/api/admin/registrations/${encodeURIComponent(registrationId)}/confirmation-email/retry`,

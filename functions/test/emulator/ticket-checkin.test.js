@@ -174,3 +174,77 @@ test('revoked ticket, unconfirmed registration and random tokens fail', async ()
   );
   assert.equal((await db.collection('checkins').get()).size, 0);
 });
+
+for (const count of [1, 10, 20]) test(`check-in burst: ${count} concurrent different tickets`, async (context) => {
+  const loadTickets = createTicketService({ db, getSigningSecret: () => ticketSecret, clock: () => now });
+  const refs = await Promise.all(Array.from({ length: count }, (_, index) => seedRegistration({ id: `burst-${index}`, registrationId: `VYR26-${String(index).padStart(20, '0')}` })));
+  const issued = await Promise.all(refs.map((ref) => loadTickets.issueForRegistrationRef(ref)));
+  const beforeRegistrations = await Promise.all(refs.map(async (ref) => (await ref.get()).data()));
+  const measurements = [];
+  const started = performance.now();
+  const results = await Promise.all(issued.map(async (ticket, index) => {
+    let credentialMs = 0;
+    const service = createCheckinService({ db, clock: () => now, ticketService: {
+      ...loadTickets, findByPayload: async (payload) => {
+        const began = performance.now();
+        const found = await loadTickets.findByPayload(payload);
+        credentialMs = performance.now() - began;
+        return found;
+      },
+    } });
+    const began = performance.now();
+    const timings = {};
+    const result = await service.checkIn({ ticketToken: ticket.ticketPayload, type: 'EVENT' }, { ...admin, uid: `staff-${index % 10}` }, timings);
+    assert.equal(timings.transactionAttempts, 1);
+    const totalMs = performance.now() - began;
+    measurements.push({ totalMs, credentialMs, transactionMs: totalMs - credentialMs });
+    return result;
+  }));
+  const elapsedMs = performance.now() - started;
+  assert.equal(results.filter((result) => result.outcome === 'CHECKED_IN').length, count);
+  const stored = (await db.collection('checkins').get()).docs.map((doc) => doc.data());
+  assert.equal(stored.length, count);
+  assert.equal(new Set(stored.map((item) => item.registrationDocId)).size, count);
+  for (let index = 0; index < count; index++) assert.deepEqual((await refs[index].get()).data(), beforeRegistrations[index]);
+  assert.equal((await db.collection('system').get()).size, 0);
+  const percentile = (key, p) => Number(measurements.map((item) => item[key]).sort((a, b) => a - b)[Math.ceil(count * p) - 1].toFixed(1));
+  context.diagnostic(JSON.stringify({ count, elapsedMs: Number(elapsedMs.toFixed(1)),
+    p50Ms: percentile('totalMs', .5), p95Ms: percentile('totalMs', .95),
+    credentialP95Ms: percentile('credentialMs', .95), transactionP95Ms: percentile('transactionMs', .95) }));
+});
+
+test('many simultaneous scans of the same ticket succeed once; uncertain-result retry is duplicate safe', async () => {
+  const ref = await seedRegistration();
+  const issued = await tickets.issueForRegistrationRef(ref);
+  const results = await Promise.all(Array.from({ length: 10 }, (_, index) => checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT' }, { ...admin, uid: `volunteer-${index}` })));
+  assert.equal(results.filter((result) => result.outcome === 'CHECKED_IN').length, 1);
+  assert.equal(results.filter((result) => result.outcome === 'ALREADY_CHECKED_IN').length, 9);
+  assert.equal((await db.collection('checkins').get()).size, 1);
+  const retry = await checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT' }, admin);
+  assert.equal(retry.outcome, 'ALREADY_CHECKED_IN');
+});
+
+test('malformed, arbitrary identities, view/recovery credentials, and mismatched ticket identity cannot check in', async () => {
+  const ref = await seedRegistration();
+  const issued = await tickets.issueForRegistrationRef(ref);
+  for (const ticketToken of [null, '', 'VYR26-00000000000000000001', issued.ticket.ticketId, issued.ticketViewToken, 'a'.repeat(64), `vyora26:t:${'Z'.repeat(43)}`]) {
+    await assert.rejects(checkins.checkIn({ ticketToken, type: 'EVENT' }, admin), { code: 'INVALID_TICKET' });
+  }
+  await assert.rejects(checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT', registrationId: 'forged' }, admin), { code: 'INVALID_CHECKIN_REQUEST' });
+  await assert.rejects(checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT' }, null), { code: 'FORBIDDEN' });
+  await db.doc(`tickets/${ref.id}`).update({ registrationDocId: 'another-registration' });
+  await assert.rejects(checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT' }, admin), { code: 'INVALID_TICKET' });
+  assert.equal((await db.collection('checkins').get()).size, 0);
+});
+
+test('credential rotation between lookup and transaction cannot accept the stale QR', async () => {
+  const ref = await seedRegistration();
+  const issued = await tickets.issueForRegistrationRef(ref);
+  const service = createCheckinService({ db, ticketService: { ...tickets, findByPayload: async (payload) => {
+    const found = await tickets.findByPayload(payload);
+    await found.ref.update({ qrTokenHash: 'b'.repeat(64) });
+    return found;
+  } } });
+  await assert.rejects(service.checkIn({ ticketToken: issued.ticketPayload, type: 'EVENT' }, admin), { code: 'INVALID_TICKET' });
+  assert.equal((await db.collection('checkins').get()).size, 0);
+});

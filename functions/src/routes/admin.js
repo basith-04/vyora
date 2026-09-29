@@ -6,6 +6,10 @@ export function createAdminRouter({
   manualReconciliationService, ticketEditService, ticketTransferService, manualTicketService,
 }) {
   const router = Router();
+  router.use((request, response, next) => {
+    if (request.method === 'POST' && request.path === '/check-ins') request.checkinReceivedAt = performance.now();
+    next();
+  });
   router.use(authorizeAdmin);
 
   router.get('/me', (request, response) => {
@@ -89,9 +93,19 @@ export function createAdminRouter({
 
   if (checkinService) {
     router.post('/check-ins', async (request, response, next) => {
+      const timings = { authMs: performance.now() - request.checkinReceivedAt };
+      const timingHeader = () => response.set('Server-Timing', [
+        `auth;dur=${timings.authMs.toFixed(1)}`,
+        ...(timings.credentialMs == null ? [] : [`credential;dur=${timings.credentialMs.toFixed(1)}`]),
+        ...(timings.transactionMs == null ? [] : [`transaction;dur=${timings.transactionMs.toFixed(1)}`]),
+        `app;dur=${(performance.now() - request.checkinReceivedAt).toFixed(1)}`,
+      ].join(', '));
       try {
-        response.status(200).json({ data: await checkinService.checkIn(request.body, request.admin) });
+        const data = await checkinService.checkIn(request.body, request.admin, timings);
+        timingHeader();
+        response.status(200).json({ data });
       } catch (error) {
+        timingHeader();
         next(error);
       }
     });

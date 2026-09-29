@@ -281,6 +281,14 @@ test('check-in API requires staff authorization and ignores no client-supplied s
   });
   assert.equal(valid.status, 200);
   assert.equal(valid.body.data.outcome, 'CHECKED_IN');
+  assert.match(valid.headers['server-timing'], /auth;dur=[\d.]+, credential;dur=[\d.]+, transaction;dur=[\d.]+, app;dur=[\d.]+/);
+  assert.deepEqual(Object.keys(valid.body.data).sort(), ['checkedInAt', 'outcome', 'participant', 'type', 'workshopId']);
+  assert.deepEqual(Object.keys(valid.body.data.participant).sort(), ['fullName', 'ieeeMember', 'registrationId', 'workshopId']);
+  assert.doesNotMatch(JSON.stringify(valid.body), /ticketToken|qrTokenHash|recoveryToken|email|phone|healthSafety/);
+  const invalid = await request(app).post('/api/admin/check-ins').set('Authorization', `Bearer ${token}`).send({ ticketToken: 'bad', type: 'EVENT' });
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.headers['server-timing'], /credential;dur=/);
+  assert.doesNotMatch(invalid.headers['server-timing'], /transaction;dur=/);
   const stored = (await db.collection('checkins').limit(1).get()).docs[0].data();
   assert.equal(stored.checkedInBy, user.uid);
 });
@@ -355,4 +363,29 @@ test('CSV export composes completion filters with selected columns across every 
   assert.equal(all.status, 200);
   assert.doesNotMatch(all.text, /PRIVATE_MEDICAL|healthSafetyNote|recoveryTokenHash/);
   assert.equal((await request(app).get(path)).status, 401);
+});
+
+for (const count of [1, 10, 20]) test(`authorized HTTP check-in burst: ${count} different tickets`, async (context) => {
+  const identities = await Promise.all(Array.from({ length: Math.min(count, 10) }, (_, index) => createIdentity(`http-burst-${count}-${index}@example.com`)));
+  await Promise.all(identities.map(({ user }) => db.doc(`admins/${user.uid}`).set({ name: 'Volunteer', email: user.email, role: 'COORDINATOR', active: true })));
+  const canonical = (await db.doc('registrations/reg-1').get()).data();
+  const issued = await Promise.all(Array.from({ length: count }, async (_, index) => {
+    const ref = db.doc(`registrations/http-burst-${index}`);
+    await ref.set({ ...canonical, registrationId: `VYR26-HTTP-${index}`, ticketIssued: false, ticketId: null });
+    return ticketService.issueForRegistrationRef(ref);
+  }));
+  const measurements = [];
+  const results = await Promise.all(issued.map(async (ticket, index) => {
+    const start = performance.now();
+    const response = await request(app).post('/api/admin/check-ins').set('Authorization', `Bearer ${identities[index % identities.length].token}`).send({ ticketToken: ticket.ticketPayload, type: 'EVENT' });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.data.outcome, 'CHECKED_IN');
+    const phases = Object.fromEntries(response.headers['server-timing'].split(', ').map((item) => { const [key, duration] = item.split(';dur='); return [key, Number(duration)]; }));
+    measurements.push({ roundTrip: performance.now() - start, ...phases });
+    return response;
+  }));
+  assert.equal(results.length, count);
+  assert.equal((await db.collection('checkins').get()).size, count);
+  const p95 = (key) => Number(measurements.map((item) => item[key]).sort((a, b) => a - b)[Math.ceil(count * .95) - 1].toFixed(1));
+  context.diagnostic(JSON.stringify({ httpCount: count, roundTripP95Ms: p95('roundTrip'), authP95Ms: p95('auth'), credentialP95Ms: p95('credential'), transactionP95Ms: p95('transaction'), appP95Ms: p95('app') }));
 });

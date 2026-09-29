@@ -5,7 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { createCompletionService } from '../../src/services/complete-registration.js';
 import { createTicketService } from '../../src/services/ticket.js';
 const registrationId = 'VYR26-ABCDEFGHIJKLMNOPQRST';
-const input = { registrationId, gender: 'MALE', foodPreference: 'VEG', healthSafetyConcern: true, healthSafetyNote: 'Need assistance' };
+const input = { registrationId, termsAccepted: true, gender: 'MALE', foodPreference: 'VEG', healthSafetyConcern: true, healthSafetyNote: 'Need assistance' };
 let app, db, service, ref;
 before(() => { app = initializeApp({ projectId: 'demo-vyora-26' }, 'completion-tests'); db = getFirestore(app); service = createCompletionService({ db }); ref = db.doc('registrations/internal-completion-id'); });
 after(async () => { await db.recursiveDelete(db.collection('completionRateLimits')); await ref.delete(); await deleteApp(app); });
@@ -14,7 +14,7 @@ test('paid confirmed submission changes exactly the intended fields and is write
   const before = (await ref.get()).data();
   assert.deepEqual(await service.submit(input), { success: true });
   const saved = (await ref.get()).data();
-  assert.deepEqual(Object.keys(saved).filter((key) => !Object.hasOwn(before, key)).sort(), ['detailsCompletedAt', 'foodPreference', 'gender', 'healthSafetyConcern', 'healthSafetyNote']);
+  assert.deepEqual(Object.keys(saved).filter((key) => !Object.hasOwn(before, key)).sort(), ['detailsCompletedAt', 'foodPreference', 'gender', 'healthSafetyConcern', 'healthSafetyNote', 'termsAccepted', 'termsAcceptedAt']);
   for (const [key, value] of Object.entries(before)) assert.deepEqual(saved[key], value);
   assert.deepEqual(await service.submit({ ...input, gender: 'FEMALE', healthSafetyNote: 'changed' }), { success: false, code: 'ALREADY_COMPLETED' });
   assert.deepEqual((await ref.get()).data(), saved);
@@ -86,4 +86,34 @@ test('many independent registration IDs have independent quotas on a shared netw
     assert.deepEqual(Object.keys(bucket.data()).sort(), ['count', 'expiresAt']);
     assert.equal(bucket.id.includes(registrationId), false);
   }
+});
+
+test('acceptance is atomic with details, server dated, and absent on failed or legacy completed attempts', async () => {
+  const original = (await ref.get()).data();
+  const { termsAccepted, ...missing } = input;
+  for (const invalid of [missing, { ...input, termsAccepted: false }, { ...input, termsAccepted: 'true' }, { ...input, termsAcceptedAt: 1 }, { ...input, healthSafetyNote: '' }]) {
+    await assert.rejects(service.submit(invalid), { code: 'INVALID_COMPLETION' });
+    assert.deepEqual((await ref.get()).data(), original);
+  }
+  const aborting = createCompletionService({ db: {
+    collection: (...args) => db.collection(...args),
+    runTransaction: (callback) => db.runTransaction(async (tx) => { await callback(tx); throw new Error('simulated commit abort'); }),
+  } });
+  await assert.rejects(aborting.submit(input), /simulated commit abort/);
+  assert.deepEqual((await ref.get()).data(), original);
+  const serverNow = 1_800_000_000_123;
+  const dated = createCompletionService({ db, clock: () => serverNow });
+  await dated.submit(input);
+  const saved = (await ref.get()).data();
+  assert.equal(saved.termsAccepted, true);
+  assert.equal(saved.termsAcceptedAt.toMillis(), serverNow);
+  assert.deepEqual(saved.termsAcceptedAt, saved.detailsCompletedAt);
+  assert.equal(saved.gender, input.gender);
+  assert.equal(saved.healthSafetyNote, input.healthSafetyNote);
+  await ref.set({ ...original, detailsCompletedAt: saved.detailsCompletedAt });
+  assert.deepEqual(await dated.submit(input), { success: false, code: 'ALREADY_COMPLETED' });
+  assert.equal(Object.hasOwn((await ref.get()).data(), 'termsAcceptedAt'), false);
+  await ref.set({ ...original, paymentStatus: 'PENDING' });
+  assert.deepEqual(await dated.submit(input), { success: false, code: 'REGISTRATION_NOT_FOUND' });
+  assert.equal(Object.hasOwn((await ref.get()).data(), 'termsAccepted'), false);
 });

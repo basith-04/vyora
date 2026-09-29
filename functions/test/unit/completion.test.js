@@ -4,7 +4,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { validateCompletion } from '../../src/services/complete-registration.js';
 import { publicRegistration, registrationsCsv } from '../../src/services/admin-reporting.js';
-const valid = { registrationId: 'VYR26-ABCDEFGHIJKLMNOPQRST', gender: 'MALE', foodPreference: 'VEG', healthSafetyConcern: false };
+const valid = { registrationId: 'VYR26-ABCDEFGHIJKLMNOPQRST', termsAccepted: true, gender: 'MALE', foodPreference: 'VEG', healthSafetyConcern: false };
 test('completion validates canonical options and conditional short health text', () => {
   for (const gender of ['MALE', 'FEMALE']) for (const foodPreference of ['VEG', 'NON_VEG']) {
     assert.equal(validateCompletion({ ...valid, gender, foodPreference }).healthSafetyNote, null);
@@ -60,4 +60,25 @@ test('public endpoint keys protection by submitted values, never the network add
     assert.deepEqual(response.body, { success: true });
     assert.deepEqual(seen.at(-1), input);
   }
+});
+
+test('backend requires strict boolean acceptance and rejects client acceptance timestamps', () => {
+  const { termsAccepted, ...missing } = valid;
+  for (const input of [missing, ...[false, null, 'true', 1, [], {}].map((value) => ({ ...valid, termsAccepted: value }))]) {
+    assert.throws(() => validateCompletion(input), (error) => error.code === 'INVALID_COMPLETION' && !!error.details.fields.termsAccepted);
+  }
+  assert.equal(validateCompletion(valid).termsAccepted, true);
+  assert.throws(() => validateCompletion({ ...valid, termsAcceptedAt: 'client-time' }), { code: 'INVALID_COMPLETION' });
+});
+
+test('completion API rejects missing, false and wrong-type acceptance with field errors and accepts true', async () => {
+  const app = createApp({ completionService: { limit: async () => {}, submit: async (input) => { validateCompletion(input); return { success: true }; } } });
+  for (const termsAccepted of [undefined, false, 'true', 1, null]) {
+    const response = await request(app).post('/api/complete-registration').send({ ...valid, termsAccepted });
+    assert.equal(response.status, 400);
+    assert.equal(response.body.code, 'INVALID_COMPLETION');
+    assert.equal(response.body.fields.termsAccepted, 'You must accept the Terms & Conditions before submitting.');
+  }
+  const success = await request(app).post('/api/complete-registration').send(valid);
+  assert.deepEqual(success.body, { success: true });
 });

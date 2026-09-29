@@ -21,7 +21,7 @@ const policyPages = {
   '/terms-and-conditions': {
   title: 'TERMS & CONDITIONS',
   eyebrow: '// TERMS.EXE',
-  intro: "These terms apply to registrations for VYORA '26, organized by IEEE Student Branch VJEC.",
+  intro: "These terms apply to registrations for and participation in VYORA '26, organized by IEEE Student Branch VJEC.",
   sections: [
     {
       heading: 'REGISTRATION',
@@ -35,15 +35,49 @@ const policyPages = {
     {
       heading: 'ATTENDEE RESPONSIBILITIES',
       bullets: [
-        'Attendees are responsible for ensuring that the information submitted during registration is correct.',
+        'Attendees are responsible for ensuring that the information submitted during registration is accurate and complete.',
         'Participants registering under the IEEE Member category must provide a valid IEEE Membership ID. If the membership details are found to be invalid or false, the participant will be required to pay the ₹400 registration fee difference along with an additional ₹150 penalty to participate in the event.',
-        'Attendees must follow the event rules and instructions communicated by IEEE Student Branch VJEC.'
+        "Participants must comply with the rules, safety requirements, schedules, and reasonable instructions communicated by the organizers, coordinators, volunteers, faculty members, and authorized personnel throughout VYORA '26.",
+        'Participants are expected to cooperate with the organizing team and conduct themselves responsibly throughout the event.'
+      ]
+    },
+    {
+      heading: 'CODE OF CONDUCT',
+      bullets: [
+        "Participants are expected to maintain respectful, responsible, and appropriate behaviour throughout VYORA '26, including at the event venue, accommodation facilities, transportation, workshops, trekking or outdoor activities, and other activities associated with the event.",
+        'Harassment, violence, threats, deliberate disruption, serious misconduct, damage to property, or behaviour that may endanger participants, organizers, staff, or others will not be tolerated.',
+        'Participants must respect the event venue, college property, accommodation facilities, equipment, and the personal property of others.',
+        'Participants must follow reasonable instructions issued by organizers and authorized personnel concerning safety, discipline, accommodation, transportation, workshops, trekking or outdoor activities, and the orderly conduct of the event.'
+      ]
+    },
+    {
+      heading: 'ALCOHOL, DRUGS & PROHIBITED SUBSTANCES',
+      bullets: [
+        "Possession, consumption, distribution, or use of alcohol, illegal drugs, or other prohibited substances during VYORA '26, within the event premises, accommodation facilities, transportation, or during activities organized as part of the event is strictly prohibited.",
+        'Participants found violating these rules may be removed from the event immediately, subject to the circumstances and applicable institutional rules.',
+        'A participant removed from the event for such misconduct will not be entitled to a refund of registration fees, accommodation charges, or other event-related payments.'
+      ]
+    },
+    {
+      heading: 'DISCIPLINARY ACTION & REMOVAL',
+      paragraphs: [
+        "The organizers reserve the right to remove a participant from VYORA '26 in cases of serious misconduct, violation of event rules, safety concerns, prohibited substance use, or repeated failure to comply with reasonable instructions from authorized event personnel.",
+        'Where appropriate, serious violations may be reported to Vimal Jyothi Engineering College, the participant’s institution, or other appropriate authorities for further action in accordance with applicable institutional rules and procedures.',
+        'Participants removed from the event for disciplinary reasons will not be eligible for a refund of registration fees, accommodation charges, or other event-related payments.'
+      ]
+    },
+    {
+      heading: 'SAFETY & EVENT ACTIVITIES',
+      bullets: [
+        "Participants must follow safety instructions provided for workshops, travel, trekking, outdoor activities, accommodation, and other activities conducted as part of VYORA '26.",
+        'Participants must immediately inform an organizer, volunteer, or authorized personnel if they become aware of a situation that may pose a significant safety risk to themselves or others.',
+        'Participants are expected to exercise reasonable care for their own safety and the safety of others while participating in event activities.'
       ]
     },
     {
       heading: 'EVENT CHANGES',
       paragraphs: [
-        'Event schedules, sessions, workshops, speakers, and other arrangements may be changed when reasonably necessary.'
+        'Event schedules, sessions, workshops, speakers, venues, activities, transportation arrangements, and other event arrangements may be changed when reasonably necessary due to operational, safety, weather, availability, or other circumstances.'
       ]
     },
     {
@@ -54,7 +88,9 @@ const policyPages = {
     },
     {
       heading: 'QUERIES',
-      paragraphs: [`Questions may be sent to ${email}.`],
+      paragraphs: [
+        `Questions regarding these terms or the event may be sent to ${email}.`
+      ],
       email: true
     },
   ],

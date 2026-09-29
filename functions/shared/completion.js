@@ -8,5 +8,6 @@ export function completionErrors(input) {
   if (!FOOD_OPTIONS.some(({ value }) => value === input.foodPreference)) errors.foodPreference = 'Select Veg or Non-Veg.';
   if (typeof input.healthSafetyConcern !== 'boolean') errors.healthSafetyConcern = 'Select No or Yes.';
   if (input.healthSafetyConcern === true && (typeof input.healthSafetyNote !== 'string' || !input.healthSafetyNote.trim() || input.healthSafetyNote.length > HEALTH_NOTE_MAX_LENGTH)) errors.healthSafetyNote = `Enter a short description (maximum ${HEALTH_NOTE_MAX_LENGTH} characters).`;
+  if (input.termsAccepted !== true) errors.termsAccepted = 'You must accept the Terms & Conditions before submitting.';
   return errors;
 }

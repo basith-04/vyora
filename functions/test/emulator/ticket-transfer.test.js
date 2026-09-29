@@ -112,6 +112,13 @@ test('transfer preserves identity/payment, moves locks/counters, rotates credent
   const newTicket = await tickets.existingForRegistrationRef(registrationRef());
   assert.equal((await tickets.viewByToken(newTicket.ticketViewToken)).participant.fullName, 'New Holder');
   assert.equal((await tickets.findByPayload(newTicket.ticketPayload)).data.ticketId, detail.ticketId);
+  for (const ticketToken of [oldTicket.ticketPayload, oldTicket.ticketViewToken, 'a'.repeat(64)]) {
+    await assert.rejects(checkins.checkIn({ ticketToken, type: 'EVENT' }, coordinator), { code: 'INVALID_TICKET' });
+  }
+  const newScan = await checkins.checkIn({ ticketToken: newTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'data-science' }, coordinator);
+  assert.equal(newScan.outcome, 'CHECKED_IN');
+  assert.equal(newScan.participant.fullName, 'New Holder');
+  await assert.rejects(checkins.checkIn({ ticketToken: newTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, coordinator), { code: 'WORKSHOP_MISMATCH' });
   assert.equal(deliveries.length, 1);
   assert.equal(deliveries[0].to, 'new@example.com');
   assert.match(deliveries[0].idempotencyKey, /transfer\/1$/);

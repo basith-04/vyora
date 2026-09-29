@@ -30,7 +30,7 @@ export default function CompleteRegistrationPage() {
     if (Object.keys(fields).length) return;
     submitting.current = true; setBusy(true); setMessage('');
     try {
-      const result = await registrationApi.complete({ ...form, registrationId: form.registrationId.trim(), healthSafetyNote: form.healthSafetyConcern ? form.healthSafetyNote : null });
+      const result = await registrationApi.complete({ ...form, registrationId: form.registrationId.replace(/\s+/g, ''), healthSafetyNote: form.healthSafetyConcern ? form.healthSafetyNote : null });
       if (result.success === true) { setSuccess(true); setForm({ registrationId: '', gender: '', foodPreference: '', healthSafetyConcern: null, healthSafetyNote: '', termsAccepted: false }); }
       else if (result.code === 'INVALID_COMPLETION' && result.fields) setErrors(result.fields);
       else setMessage(messages[result.code] || 'Unable to submit details. Please try again.');

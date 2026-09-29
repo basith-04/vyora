@@ -15,6 +15,21 @@ export function checkinPresentation(value) {
     ADMIN_TOKEN_INVALID: 'STAFF SESSION EXPIRED',
     ADMIN_ACCESS_DENIED: 'STAFF ACCESS DENIED',
     NETWORK_ERROR: 'NETWORK ERROR',
+    CHECKIN_TIMEOUT: 'NETWORK TIMEOUT',
+    INVALID_RESPONSE: 'CHECK-IN NOT CONFIRMED',
   };
   return { kind: 'error', icon: '✕', title: messages[code] || 'CHECK-IN FAILED' };
+}
+
+// Used by the camera callback and the parent request path. Only explicit re-arm releases it.
+export function createScanGate() {
+  let locked = false;
+  return {
+    claim() { if (locked) return false; locked = true; return true; },
+    rearm() { locked = false; },
+  };
+}
+
+export function canRetryCheckin(result) {
+  return ['NETWORK_ERROR', 'CHECKIN_TIMEOUT', 'INTERNAL_ERROR', 'INVALID_RESPONSE', 'CHECKIN_FAILED'].includes(result?.code);
 }

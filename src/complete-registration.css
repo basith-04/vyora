@@ -4,3 +4,7 @@
 .completion-fields h2 { margin: 26px 0 0; font: 700 16px/1.5 var(--font-technical); }
 .completion-note { margin-top: 20px; }
 .completion-note textarea { width: 100%; resize: vertical; padding: 12px; border: 0; background: transparent; color: var(--vyora-ink); font: 500 16px/1.5 var(--font-technical); }
+
+.completion-terms > label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.completion-terms input { flex: none; margin: 3px 0 0; accent-color: var(--vyora-blue); }
+.completion-terms a { color: var(--vyora-blue); text-decoration: underline; }

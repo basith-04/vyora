@@ -64,7 +64,13 @@ export const ORDER_CREATION_STATUS = Object.freeze({
 export const CHECKIN_TYPE = Object.freeze({
   event: 'EVENT',
   workshop: 'WORKSHOP',
+  day1Checkout: 'DAY1_CHECK_OUT',
+  fieldTripDeparture: 'FIELD_TRIP_DEPARTURE',
+  fieldTripReturn: 'FIELD_TRIP_RETURN',
+  day2Checkout: 'DAY2_CHECK_OUT',
 });
+
+export const CHECKOUT_GROUP = Object.freeze({ all: 'ALL', stay: 'STAY' });
 
 export const DEFAULT_CONFIGURATION = Object.freeze({
   capacity: {

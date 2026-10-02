@@ -105,6 +105,26 @@
 .checkin-layout { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(260px,.7fr); gap: 1rem; align-items: start; }
 .checkin-control { min-width: 0; border: 3px solid var(--admin-cyan); background: var(--admin-navy); color: #fff; padding: clamp(1rem,3vw,2rem); box-shadow: 5px 5px 0 #04121c; }
 .checkin-control.mode-workshop { border-color: var(--admin-orange); }
+.attendance-page { display: grid; gap: 1rem; }
+.attendance-day { margin-top: 1.25rem; }
+.attendance-day h3 { margin: 0 0 .7rem; color: var(--admin-navy); }
+.attendance-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
+.attendance-choices button { display: flex; align-items: center; justify-content: space-between; min-height: 5rem; padding: 1rem; background: var(--admin-navy); color: #fff; border: 2px solid var(--admin-cyan); text-align: left; font-weight: 800; cursor: pointer; }
+.attendance-choices button:hover, .attendance-choices button:focus-visible { border-color: var(--admin-orange); }
+.attendance-back { justify-self: start; }
+.attendance-heading { background: var(--admin-navy); border: 4px solid var(--admin-orange); color: white; padding: 1rem 1.4rem; }
+.attendance-heading h2 { margin: .4rem 0 0; font-family: Bungee, sans-serif; font-weight: 400; font-size: clamp(1.25rem, 3vw, 2rem); }
+.attendance-select { display: grid; gap: .4rem; max-width: 28rem; font-weight: 800; }
+.attendance-select select { min-height: 2.8rem; padding: .5rem; }
+.attendance-active-label { display: block; width: 100%; background: var(--admin-orange); color: #092b36; padding: .6rem; margin-bottom: .8rem; font-weight: 900; letter-spacing: .04em; }
+.attendance-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+.attendance-metrics div { display: grid; gap: .2rem; background: #e6f6ee; padding: .8rem; }
+.attendance-metrics strong { font-size: clamp(1.5rem, 4vw, 2.4rem); }
+.attendance-status { color: #355b62; }
+.attendance-stale { color: #a33718; font-weight: 800; }
+.attendance-remaining ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .5rem; list-style: none; padding: 0; }
+.attendance-remaining li { display: grid; gap: .2rem; border: 1px solid var(--admin-border); padding: .7rem; }
+.attendance-remaining li span, .attendance-remaining li small { overflow-wrap: anywhere; }
 .checkin-control h2 { margin: .2rem 0 1rem; font-family: Bungee, sans-serif; font-weight: 400; letter-spacing: .08em; }
 .checkin-mode { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
 .checkin-mode button { min-height: 58px; border: 2px solid #75979b; background: transparent; color: #bcd0ce; font-size: 1rem; }

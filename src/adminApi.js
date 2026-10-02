@@ -60,6 +60,7 @@ export const submitTicketTransfer = (auth, id, input) => adminRequest(auth, `/ap
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
 });
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
+export const loadAttendanceSummary = (auth, selection) => adminRequest(auth, `/api/admin/check-ins/summary?${new URLSearchParams(selection)}`);
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export function downloadRegistrationsCsv(auth, search = '', filters = {}, columns) {
   const query = new URLSearchParams();

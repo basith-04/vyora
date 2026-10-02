@@ -92,6 +92,10 @@ export function createAdminRouter({
   });
 
   if (checkinService) {
+    router.get('/check-ins/summary', async (request, response, next) => {
+      try { response.json({ data: await checkinService.summary(request.query, request.admin) }); }
+      catch (error) { next(error); }
+    });
     router.post('/check-ins', async (request, response, next) => {
       const timings = { authMs: performance.now() - request.checkinReceivedAt };
       const timingHeader = () => response.set('Server-Timing', [

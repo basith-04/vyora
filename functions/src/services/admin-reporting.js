@@ -340,7 +340,8 @@ export function createAdminReportingService({ db }) {
     const attendance = new Map();
     for (const checkin of checkins) {
       const current = attendance.get(checkin.registrationDocId) || {};
-      current[checkin.type === 'EVENT' ? 'event' : 'workshop'] = checkin;
+      if (checkin.type === 'EVENT') current.event = checkin;
+      if (checkin.type === 'WORKSHOP') current.workshop = checkin;
       attendance.set(checkin.registrationDocId, current);
     }
     const paymentMap = latestPayments(payments);

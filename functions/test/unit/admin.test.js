@@ -166,6 +166,14 @@ test('dashboard metrics distinguish operational capacity, registration states an
   assert.equal(result.accommodation.hostels.PG_HOUSE_NEAR_COLLEGE, 1);
 });
 
+test('new checkpoint records do not inflate legacy event or workshop reporting', () => {
+  const result = buildDashboard({ registrations: [], payments: [], capacity: {}, workshops: {}, checkins: [
+    { type: 'EVENT' }, { type: 'WORKSHOP' }, { type: 'DAY1_CHECK_OUT' },
+    { type: 'FIELD_TRIP_DEPARTURE' }, { type: 'FIELD_TRIP_RETURN' }, { type: 'DAY2_CHECK_OUT' },
+  ] });
+  assert.deepEqual(result.attendance, { event: 1, workshop: 1 });
+});
+
 test('admin registration response omits recovery and order-coordination internals', () => {
   const result = publicRegistration({
     registrationId: 'VYR26-SAFE', fullName: 'Safe Participant', email: 'safe@example.com', phone: '9876543210',

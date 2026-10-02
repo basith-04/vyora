@@ -293,6 +293,25 @@ test('check-in API requires staff authorization and ignores no client-supplied s
   assert.equal(stored.checkedInBy, user.uid);
 });
 
+test('attendance summary allows active ADMIN and COORDINATOR with minimal participant data', async () => {
+  const path = '/api/admin/check-ins/summary?type=FIELD_TRIP_RETURN';
+  assert.equal((await request(app).get(path)).status, 401);
+  for (const role of ['ADMIN', 'COORDINATOR']) {
+    const { user, token } = await createIdentity(`summary-${role.toLowerCase()}@example.com`);
+    await db.doc(`admins/${user.uid}`).set({ name: role, role, active: true });
+    const response = await request(app).get(path).set('Authorization', `Bearer ${token}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.data.expected, 1);
+    assert.deepEqual(Object.keys(response.body.data.remaining[0]).sort(), ['fullName', 'registrationId']);
+    assert.doesNotMatch(JSON.stringify(response.body.data), /email|phone|healthSafety|qrToken|recoveryToken|razorpay/);
+    if (role === 'COORDINATOR') {
+      assert.equal((await request(app).get('/api/admin/tickets').set('Authorization', `Bearer ${token}`)).status, 403);
+    }
+    await db.doc(`admins/${user.uid}`).update({ active: false });
+    assert.equal((await request(app).get(path).set('Authorization', `Bearer ${token}`)).status, 403);
+  }
+});
+
 test('confirmation email retry endpoint requires an active staff identity', async () => {
   const path = '/api/admin/registrations/VYR26-ADMIN-1/confirmation-email/retry';
   assert.equal((await request(app).post(path)).status, 401);

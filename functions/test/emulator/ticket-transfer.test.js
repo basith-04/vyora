@@ -152,10 +152,11 @@ test('duplicate email, duplicate phone, arbitrary fields, and coordinator are re
   assert.equal((await ticketRef().get()).data().credentialVersion, undefined);
 });
 
-for (const type of ['EVENT', 'WORKSHOP']) test(`${type} check-in prevents transfer without changing state`, async () => {
+for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) test(`${type} check-in prevents transfer without changing state`, async () => {
     const issued = await tickets.existingForRegistrationRef(registrationRef());
     await checkins.checkIn({ ticketToken: issued.ticketPayload, type,
-      ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}) }, coordinator);
+      ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
+      ...(['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT'].includes(type) ? { accommodationGroup: 'ALL' } : {}) }, coordinator);
     const detail = await transfer.detail(registrationId, admin);
     const before = (await registrationRef().get()).data();
     const ticketBefore = (await ticketRef().get()).data();

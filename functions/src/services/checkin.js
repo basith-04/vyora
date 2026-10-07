@@ -5,6 +5,7 @@ import {
   CHECKIN_TYPE, CHECKOUT_GROUP, COLLECTIONS, HOSTELS, WORKSHOP_IDS,
 } from '../config/constants.js';
 import { isPaidConfirmed } from './ticket.js';
+import { matchesRegistrationFilters } from '../../shared/report-filters.js';
 
 const CHECKOUT_TYPES = new Set([CHECKIN_TYPE.day1Checkout, CHECKIN_TYPE.day2Checkout]);
 const TYPES = new Set(Object.values(CHECKIN_TYPE));
@@ -54,9 +55,14 @@ function validateSelection(input, scan = false) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new AppError('INVALID_CHECKIN_REQUEST', 'Check-in data is required.', 400);
   }
-  const allowed = new Set(scan ? ['ticketToken', 'type', 'workshopId', 'accommodationGroup'] : ['type', 'workshopId', 'accommodationGroup']);
+  const allowed = new Set(scan ? ['ticketToken', 'registrationDocId', 'type', 'workshopId', 'accommodationGroup'] : ['type', 'workshopId', 'accommodationGroup']);
   if (Object.keys(input).some((field) => !allowed.has(field))) {
     throw new AppError('INVALID_CHECKIN_REQUEST', 'The check-in request contains unsupported fields.', 400);
+  }
+  if (scan && ((Object.hasOwn(input, 'ticketToken') && Object.hasOwn(input, 'registrationDocId'))
+    || (Object.hasOwn(input, 'registrationDocId') && (typeof input.registrationDocId !== 'string'
+      || !input.registrationDocId.trim() || input.registrationDocId.length > 1500 || input.registrationDocId.includes('/'))))) {
+    throw new AppError('INVALID_CHECKIN_REQUEST', 'Supply either a QR payload or a canonical registration reference.', 400);
   }
   if (!TYPES.has(input.type)) {
     throw new AppError('INVALID_CHECKIN_TYPE', 'Select a valid attendance checkpoint.', 400);
@@ -74,7 +80,7 @@ function validateSelection(input, scan = false) {
   } else if (input.accommodationGroup != null) {
     throw new AppError('INVALID_CHECKIN_REQUEST', 'Accommodation group is only valid for checkout.', 400);
   }
-  return { ticketToken: input.ticketToken, type: input.type, workshopId: input.workshopId ?? null,
+  return { ticketToken: input.ticketToken, registrationDocId: input.registrationDocId, type: input.type, workshopId: input.workshopId ?? null,
     accommodationGroup: input.accommodationGroup ?? null };
 }
 
@@ -85,7 +91,19 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
       const checked = validateSelection(input, true);
       let ticket;
       const credentialStarted = performance.now();
-      try { ticket = await ticketService.findByPayload(checked.ticketToken); }
+      try {
+        if (checked.registrationDocId != null) {
+          // Staff selection resolves the same canonical ticket; the transaction below
+          // rechecks ticket/registration integrity and all attendance rules.
+          const ref = db.collection(COLLECTIONS.tickets).doc(checked.registrationDocId);
+          const snapshot = await ref.get();
+          if (!snapshot.exists) throw new AppError('INVALID_TICKET', 'The ticket could not be found.', 404);
+          ticket = { ref, data: snapshot.data() };
+          if (ticket.data.registrationDocId !== checked.registrationDocId) {
+            throw new AppError('INVALID_TICKET', 'The ticket could not be found.', 404);
+          }
+        } else ticket = await ticketService.findByPayload(checked.ticketToken);
+      }
       finally { timings.credentialMs = performance.now() - credentialStarted; }
       const registrationRef = db.collection(COLLECTIONS.registrations).doc(ticket.data.registrationDocId);
       const checkinRef = db.collection(COLLECTIONS.checkins).doc(
@@ -158,6 +176,36 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
         });
       } finally { timings.transactionMs = performance.now() - transactionStarted; }
       return participantResult(result.registration, result.checkin, result.outcome);
+    },
+    async searchParticipants(input, admin) {
+      assertStaff(admin);
+      if (!input || Object.keys(input).some((key) => key !== 'search')
+        || typeof input.search !== 'string' || input.search.length > 120) {
+        throw new AppError('INVALID_CHECKIN_REQUEST', 'Supply a participant name of up to 120 characters.', 400);
+      }
+      const search = input.search.trim().replace(/\s+/g, ' ');
+      if (search.length < 2) return { participants: [] };
+      // Small venue roster: reuse existing substring matching without a search index.
+      // Select only identification/eligibility fields, never health or credentials.
+      const [registrations, tickets] = await Promise.all([
+        db.collection(COLLECTIONS.registrations).select('fullName', 'registrationId', 'workshopId',
+          'isHosteller', 'hostel', 'needsStay', 'registrationStatus', 'paymentStatus', 'ticketIssued', 'ticketId').get(),
+        db.collection(COLLECTIONS.tickets).select('registrationDocId', 'registrationId', 'ticketId', 'active').get(),
+      ]);
+      const ticketMap = new Map(tickets.docs.map((doc) => [doc.id, doc.data()]));
+      const participants = registrations.docs.flatMap((doc) => {
+        const registration = doc.data();
+        const ticket = ticketMap.get(doc.id);
+        if (!isPaidConfirmed(registration) || registration.ticketIssued !== true || !ticket
+          || ticket.active !== true || ticket.registrationDocId !== doc.id
+          || ticket.registrationId !== registration.registrationId || ticket.ticketId !== registration.ticketId
+          || !matchesRegistrationFilters({ fullName: String(registration.fullName || '').replace(/\s+/g, ' ') }, search)) return [];
+        return [{ registrationDocId: doc.id, fullName: registration.fullName,
+          registrationId: registration.registrationId, workshopId: registration.workshopId,
+          accommodationGroup: accommodationGroup(registration) }];
+      });
+      participants.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.registrationId.localeCompare(b.registrationId));
+      return { participants };
     },
     async summary(input, admin) {
       assertStaff(admin);

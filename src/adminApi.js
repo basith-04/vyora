@@ -60,6 +60,8 @@ export const submitTicketTransfer = (auth, id, input) => adminRequest(auth, `/ap
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
 });
 export const loadRegistrations = (auth) => adminRequest(auth, '/api/admin/registrations');
+export const searchAttendanceParticipants = (auth, search, options = {}) => adminRequest(auth,
+  `/api/admin/check-ins/participants?${new URLSearchParams({ search })}`, options);
 export const loadAttendanceSummary = (auth, selection) => adminRequest(auth, `/api/admin/check-ins/summary?${new URLSearchParams(selection)}`);
 export const loadRegistration = (auth, id) => adminRequest(auth, `/api/admin/registrations/${encodeURIComponent(id)}`);
 export function downloadRegistrationsCsv(auth, search = '', filters = {}, columns) {
@@ -73,11 +75,12 @@ export function downloadRegistrationsCsv(auth, search = '', filters = {}, column
   return adminRequest(auth, `/api/admin/export/registrations.csv${suffix}`, { responseType: 'blob' });
 }
 export async function submitCheckin(auth, input, { timeoutMs = 20_000 } = {}) {
+  const subject = input.registrationDocId ? 'participant' : 'ticket';
   const controller = new AbortController();
   let timer;
   const deadline = new Promise((resolve, reject) => {
     timer = setTimeout(() => {
-      reject(new AdminApiError('CHECKIN_TIMEOUT', 'The request timed out. Check-in may have been recorded. Retry this ticket to confirm.', 0));
+      reject(new AdminApiError('CHECKIN_TIMEOUT', `The request timed out. Check-in may have been recorded. Retry this ${subject} to confirm.`, 0));
       controller.abort();
     }, timeoutMs);
   });
@@ -87,12 +90,12 @@ export async function submitCheckin(auth, input, { timeoutMs = 20_000 } = {}) {
       body: JSON.stringify(input), signal: controller.signal,
     }), deadline]);
     if (!['CHECKED_IN', 'ALREADY_CHECKED_IN'].includes(data?.outcome)) {
-      throw new AdminApiError('INVALID_RESPONSE', 'Check-in could not be confirmed. Retry this ticket.', 0);
+      throw new AdminApiError('INVALID_RESPONSE', `Check-in could not be confirmed. Retry this ${subject}.`, 0);
     }
     return data;
   } catch (error) {
-    if (error.code === 'NETWORK_ERROR') error.message = 'Connection lost. Check-in may have been recorded. Retry this ticket to confirm.';
-    if (!error.code) throw new AdminApiError('INVALID_RESPONSE', 'Check-in could not be confirmed. Retry this ticket.', 0);
+    if (error.code === 'NETWORK_ERROR') error.message = `Connection lost. Check-in may have been recorded. Retry this ${subject} to confirm.`;
+    if (!error.code) throw new AdminApiError('INVALID_RESPONSE', `Check-in could not be confirmed. Retry this ${subject}.`, 0);
     throw error;
   } finally { clearTimeout(timer); }
 }

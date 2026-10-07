@@ -92,6 +92,10 @@ export function createAdminRouter({
   });
 
   if (checkinService) {
+    router.get('/check-ins/participants', async (request, response, next) => {
+      try { response.json({ data: await checkinService.searchParticipants(request.query, request.admin) }); }
+      catch (error) { next(error); }
+    });
     router.get('/check-ins/summary', async (request, response, next) => {
       try { response.json({ data: await checkinService.summary(request.query, request.admin) }); }
       catch (error) { next(error); }

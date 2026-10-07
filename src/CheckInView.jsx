@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ManualCheckin from './ManualCheckin.jsx';
 import QrScanner from './QrScanner.jsx';
 import { loadAttendanceSummary, submitCheckin } from './adminApi.js';
 import { checkinPresentation, createScanGate, canRetryCheckin } from './checkinUi.js';
 import { formatDate, workshopLabels } from './adminData.js';
 import { accommodationGroups, checkpoints, groupLabel } from './attendanceConfig.js';
 
-function Result({ result, checkpoint, selectedWorkshop, onNext, onRetry }) {
+function Result({ result, checkpoint, selectedWorkshop, onNext, onRetry, manual }) {
   const presentation = checkinPresentation(result);
   const participant = result?.participant;
   return <section className={`checkin-result result-${presentation.kind}`} role="status" aria-live="assertive">
@@ -16,7 +17,7 @@ function Result({ result, checkpoint, selectedWorkshop, onNext, onRetry }) {
     {result?.code === 'WORKSHOP_MISMATCH' && <div className="wrong-workshop"><span>Participant registered for: <strong>{workshopLabels[result.details?.registeredWorkshopId]}</strong></span><span>Scanner set to: <strong>{workshopLabels[selectedWorkshop]}</strong></span></div>}
     {result?.code === 'ACCOMMODATION_GROUP_MISMATCH' && <div className="wrong-workshop"><span>No checkout was recorded.</span><span>Participant belongs to: <strong>{groupLabel(result.details?.registeredGroup)}</strong></span><span>Selected group: <strong>{groupLabel(result.details?.selectedGroup)}</strong></span></div>}
     {!participant && result?.message && result?.code !== 'ACCOMMODATION_GROUP_MISMATCH' && <p>{result.message}</p>}
-    {canRetryCheckin(result) && <button type="button" onClick={onRetry}>RETRY THIS TICKET</button>}
+    {canRetryCheckin(result) && <button type="button" onClick={onRetry}>{manual ? 'RETRY THIS PARTICIPANT' : 'RETRY THIS TICKET'}</button>}
     <button type="button" onClick={onNext}>SCAN NEXT</button>
   </section>;
 }
@@ -27,14 +28,14 @@ export default function CheckInView({ auth }) {
   const [accommodationGroup, setAccommodationGroup] = useState('ALL');
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [manualToken, setManualToken] = useState('');
+  const [manualParticipant, setManualParticipant] = useState(null);
   const [restartKey, setRestartKey] = useState(0);
   const [summary, setSummary] = useState(null);
   const [summaryState, setSummaryState] = useState('loading');
   const [summaryError, setSummaryError] = useState('');
   const inFlight = useRef(false);
   const scanGate = useRef(createScanGate());
-  const lastToken = useRef(null);
+  const lastIdentity = useRef(null);
   const summaryGeneration = useRef(0);
   const selectionKey = checkpoint ? JSON.stringify({ type: checkpoint.type,
     ...(checkpoint.workshop ? { workshopId } : {}),
@@ -65,15 +66,15 @@ export default function CheckInView({ auth }) {
     return () => { clearInterval(interval); summaryGeneration.current += 1; };
   }, [selectionKey, checkpoint?.workshop, workshopId, refreshSummary]);
 
-  const processToken = useCallback(async (ticketToken) => {
+  const processIdentity = useCallback(async (identity) => {
     if (!scanGate.current.claim()) return;
     if (checkpoint.workshop && !workshopId) {
       setResult({ code: 'WORKSHOP_REQUIRED', message: 'Select the workshop before scanning.' }); return;
     }
-    lastToken.current = ticketToken;
+    lastIdentity.current = identity;
     inFlight.current = true; setSubmitting(true); setResult(null);
     try {
-      const next = await submitCheckin(auth, { ticketToken: ticketToken.trim(), ...JSON.parse(selectionKey) });
+      const next = await submitCheckin(auth, { ...identity, ...JSON.parse(selectionKey) });
       setResult(next);
       if (next.outcome === 'CHECKED_IN') {
         setSummary((previous) => {
@@ -89,10 +90,12 @@ export default function CheckInView({ auth }) {
     } finally { inFlight.current = false; setSubmitting(false); }
   }, [auth, checkpoint, workshopId, selectionKey, refreshSummary]);
 
+  const processToken = useCallback((ticketToken) => processIdentity({ ticketToken: ticketToken.trim() }), [processIdentity]);
+
   const scanNext = () => {
     if (inFlight.current) return;
-    scanGate.current.rearm(); lastToken.current = null;
-    setResult(null); setManualToken(''); setRestartKey((value) => value + 1);
+    scanGate.current.rearm(); lastIdentity.current = null;
+    setResult(null); setManualParticipant(null); setRestartKey((value) => value + 1);
   };
   const chooseCheckpoint = (next) => {
     if (inFlight.current) return;
@@ -114,11 +117,14 @@ export default function CheckInView({ auth }) {
       {checkpoint.workshop && !workshopId ? <p>Select a workshop to see its attendance.</p> : <><p className={summaryState === 'stale' ? 'attendance-stale' : 'attendance-status'}>{summaryState === 'loading' ? 'Loading current attendance…' : summaryState === 'refreshing' ? 'Refreshing attendance…' : summaryState === 'stale' ? `Attendance may be stale. ${summaryError}` : 'Current as of last refresh · updates every 15 seconds'}</p>
         {visibleSummary && <div className="attendance-metrics"><div><span>Expected</span><strong>{visibleSummary.expected}</strong></div><div><span>{checkpoint.action}</span><strong>{visibleSummary.scanned}</strong></div><div><span>Remaining</span><strong>{visibleSummary.remainingCount}</strong></div></div>}</>}
     </section>
-    <div className="checkin-layout"><section className={`checkin-control mode-${checkpoint.type.toLowerCase()}`}><div className="active-mode-banner"><strong>{checkpoint.banner}</strong><span>{scannerReady ? 'Scanner ready' : submitting ? 'Processing…' : result ? 'Result ready · scan next to continue' : 'Select required options'}</span></div>
-      {!result && <QrScanner active={scannerReady} restartKey={restartKey} onDetected={processToken} />}
+    <div className="checkin-layout"><section className={`checkin-control mode-${checkpoint.type.toLowerCase()}`}><div className="active-mode-banner"><strong>{checkpoint.banner}</strong><span>{manualParticipant && !result && !submitting ? 'Manual confirmation · camera paused' : scannerReady ? 'Scanner ready' : submitting ? 'Processing…' : result ? 'Result ready · scan next to continue' : 'Select required options'}</span></div>
+      {!result && <QrScanner active={scannerReady && !manualParticipant} restartKey={restartKey} onDetected={processToken} />}
       {submitting && <div className="scanner-processing"><div className="admin-spinner" /><strong>VALIDATING WITH SERVER… · {checkpoint.banner}</strong></div>}
-      {result && <Result result={result} checkpoint={checkpoint} selectedWorkshop={workshopId} onNext={scanNext} onRetry={() => { const token = lastToken.current; if (!token || inFlight.current) return; scanGate.current.rearm(); processToken(token); }} />}
-    </section><aside className="manual-checkin admin-panel"><h2>Manual QR payload</h2><p>Camera unavailable? Paste the complete payload from a trusted QR reader. Validation still happens on the backend.</p><form onSubmit={(event) => { event.preventDefault(); processToken(manualToken); }}><label>Ticket payload<textarea disabled={submitting} value={manualToken} onChange={(event) => setManualToken(event.target.value)} placeholder="vyora26:t:…" rows="3" /></label><button type="submit" disabled={!manualToken.trim() || submitting || Boolean(result) || !scannerReady}>VALIDATE TICKET</button></form></aside></div>
+      {result && <Result result={result} checkpoint={checkpoint} selectedWorkshop={workshopId} manual={Boolean(lastIdentity.current?.registrationDocId)} onNext={scanNext} onRetry={() => { const token = lastIdentity.current; if (!token || inFlight.current) return; scanGate.current.rearm(); processIdentity(token); }} />}
+    </section><ManualCheckin key={`${selectionKey}:${restartKey}`} auth={auth} checkpoint={checkpoint}
+      workshopId={workshopId} accommodationGroup={accommodationGroup} disabled={!scannerReady}
+      selected={manualParticipant} onSelect={setManualParticipant}
+      onConfirm={() => processIdentity({ registrationDocId: manualParticipant.registrationDocId })} /></div>
     <section className="admin-panel attendance-remaining"><div className="panel-heading"><h3>{checkpoint.remaining}</h3><span>{visibleSummary?.remainingCount ?? '—'} participants</span></div>{summaryState === 'stale' && <p className="attendance-stale">Refresh before making a final headcount.</p>}
       {visibleSummary?.remaining.length ? <ul>{visibleSummary.remaining.map((item) => <li key={item.registrationId}><strong>{item.fullName}</strong><span>{item.registrationId}</span>{checkpoint.checkout && <small>{groupLabel(item.accommodationGroup)}</small>}</li>)}</ul> : <p>{visibleSummary ? 'Everyone in this selection has been accounted for.' : checkpoint.workshop && !workshopId ? 'Select a workshop to see its remaining participants.' : summaryState === 'stale' ? 'Participant list unavailable. Retry the summary.' : 'Loading participant list…'}</p>}
     </section>

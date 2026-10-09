@@ -228,7 +228,7 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
           && accommodationGroup(registration) !== selected.accommodationGroup) continue;
         expected += 1;
         if (attended.has(doc.id)) { scanned += 1; continue; }
-        remaining.push({ fullName: registration.fullName, registrationId: registration.registrationId,
+        remaining.push({ fullName: registration.fullName, registrationId: registration.registrationId, phone: registration.phone ?? null,
           ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId } : {}),
           ...(CHECKOUT_TYPES.has(selected.type) ? { accommodationGroup: accommodationGroup(registration) } : {}) });
       }

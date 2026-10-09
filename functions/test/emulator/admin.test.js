@@ -295,15 +295,19 @@ test('check-in API requires staff authorization and ignores no client-supplied s
 
 test('attendance summary allows active ADMIN and COORDINATOR with minimal participant data', async () => {
   const path = '/api/admin/check-ins/summary?type=FIELD_TRIP_RETURN';
+  await db.doc('registrations/reg-1').update({ healthSafetyNote: 'PRIVATE HEALTH', ticketPayload: 'PRIVATE QR', viewTokenHash: 'PRIVATE VIEW' });
   assert.equal((await request(app).get(path)).status, 401);
+  assert.equal((await request(app).get(path).set('Authorization', 'Bearer invalid')).status, 401);
   for (const role of ['ADMIN', 'COORDINATOR']) {
     const { user, token } = await createIdentity(`summary-${role.toLowerCase()}@example.com`);
+    assert.equal((await request(app).get(path).set('Authorization', `Bearer ${token}`)).status, 403);
     await db.doc(`admins/${user.uid}`).set({ name: role, role, active: true });
     const response = await request(app).get(path).set('Authorization', `Bearer ${token}`);
     assert.equal(response.status, 200);
-    assert.equal(response.body.data.expected, 1);
-    assert.deepEqual(Object.keys(response.body.data.remaining[0]).sort(), ['fullName', 'registrationId']);
-    assert.doesNotMatch(JSON.stringify(response.body.data), /email|phone|healthSafety|qrToken|recoveryToken|razorpay/);
+    assert.deepEqual([response.body.data.expected, response.body.data.scanned, response.body.data.remainingCount], [1, 0, 1]);
+    assert.deepEqual(Object.keys(response.body.data.remaining[0]).sort(), ['fullName', 'phone', 'registrationId']);
+    assert.equal(response.body.data.remaining[0].phone, '9876543210');
+    assert.doesNotMatch(JSON.stringify(response.body.data), /email|healthSafety|qrToken|ticketPayload|viewToken|recoveryToken|razorpay|PRIVATE/);
     if (role === 'COORDINATOR') {
       assert.equal((await request(app).get('/api/admin/tickets').set('Authorization', `Bearer ${token}`)).status, 403);
     }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ManualCheckin from './ManualCheckin.jsx';
+import PendingParticipant from './PendingParticipant.jsx';
 import QrScanner from './QrScanner.jsx';
 import { loadAttendanceSummary, submitCheckin } from './adminApi.js';
 import { checkinPresentation, createScanGate, canRetryCheckin } from './checkinUi.js';
@@ -126,7 +127,7 @@ export default function CheckInView({ auth }) {
       selected={manualParticipant} onSelect={setManualParticipant}
       onConfirm={() => processIdentity({ registrationDocId: manualParticipant.registrationDocId })} /></div>
     <section className="admin-panel attendance-remaining"><div className="panel-heading"><h3>{checkpoint.remaining}</h3><span>{visibleSummary?.remainingCount ?? '—'} participants</span></div>{summaryState === 'stale' && <p className="attendance-stale">Refresh before making a final headcount.</p>}
-      {visibleSummary?.remaining.length ? <ul>{visibleSummary.remaining.map((item) => <li key={item.registrationId}><strong>{item.fullName}</strong><span>{item.registrationId}</span>{checkpoint.checkout && <small>{groupLabel(item.accommodationGroup)}</small>}</li>)}</ul> : <p>{visibleSummary ? 'Everyone in this selection has been accounted for.' : checkpoint.workshop && !workshopId ? 'Select a workshop to see its remaining participants.' : summaryState === 'stale' ? 'Participant list unavailable. Retry the summary.' : 'Loading participant list…'}</p>}
+      {visibleSummary?.remaining.length ? <ul>{visibleSummary.remaining.map((item) => <PendingParticipant key={`${selectionKey}:${item.registrationId}`} participant={item} checkout={checkpoint.checkout} />)}</ul> : <p>{visibleSummary ? 'Everyone in this selection has been accounted for.' : checkpoint.workshop && !workshopId ? 'Select a workshop to see its remaining participants.' : summaryState === 'stale' ? 'Participant list unavailable. Retry the summary.' : 'Loading participant list…'}</p>}
     </section>
   </div>;
 }

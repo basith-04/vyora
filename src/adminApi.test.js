@@ -181,3 +181,19 @@ test('check-in never reports success for network, backend or malformed-response 
     await assert.rejects(submitCheckin(auth(), input), { code: 'INVALID_RESPONSE' });
   }
 });
+
+test('attendance name search uses authenticated backend and manual submission sends internal identity and scope', async (context) => {
+  const { searchAttendanceParticipants, submitCheckin } = await import('./adminApi.js');
+  const input = { registrationDocId: 'internal-id', type: 'DAY1_CHECK_OUT', accommodationGroup: 'SANTHOME' };
+  context.mock.method(globalThis, 'fetch', async (path, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    if (options.method === 'POST') {
+      assert.equal(path, '/api/admin/check-ins'); assert.deepEqual(JSON.parse(options.body), input);
+      return new Response(JSON.stringify({ data: { outcome: 'CHECKED_IN' } }), { status: 200 });
+    }
+    assert.equal(path, '/api/admin/check-ins/participants?search=Abdul+Basith');
+    return new Response(JSON.stringify({ data: { participants: [{ fullName: 'Abdul Basith PV', registrationDocId: 'internal-id' }] } }), { status: 200 });
+  });
+  assert.equal((await searchAttendanceParticipants(auth(), 'Abdul Basith')).participants.length, 1);
+  assert.equal((await submitCheckin(auth(), input)).outcome, 'CHECKED_IN');
+});

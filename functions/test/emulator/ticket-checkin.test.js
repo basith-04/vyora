@@ -339,3 +339,116 @@ test('unconfirmed or cancelled registrations cannot create field-trip attendance
   }
   assert.equal((await db.collection('checkins').get()).size, 0);
 });
+
+for (const role of ['ADMIN', 'COORDINATOR']) test(`${role} name search uses canonical eligible registrations and a minimal projection`, async () => {
+  for (const [id, publicId, fullName] of [
+    ['name-a', 'VYR26-A', 'Abdul Basith PV'], ['name-b', 'VYR26-B', 'Abdul Basith PV'],
+    ['name-c', 'VYR26-C', 'Abdul Rahman'],
+  ]) {
+    const ref = await seedRegistration({ id, registrationId: publicId,
+      accommodation: { isHosteller: true, hostel: 'SANJOSE' } });
+    await ref.update({ fullName, healthSafetyNote: 'PRIVATE HEALTH', razorpayPaymentId: 'PRIVATE PAYMENT' });
+    await tickets.issueForRegistrationRef(ref);
+  }
+  const unpaid = await seedRegistration({ id: 'unpaid', registrationId: 'VYR26-UNPAID' });
+  await unpaid.update({ fullName: 'Abdul Unpaid' }); await tickets.issueForRegistrationRef(unpaid);
+  await unpaid.update({ paymentStatus: 'PENDING' });
+  const revoked = await seedRegistration({ id: 'revoked', registrationId: 'VYR26-REVOKED' });
+  await revoked.update({ fullName: 'Abdul Revoked' }); await tickets.issueForRegistrationRef(revoked);
+  await db.doc('tickets/revoked').update({ active: false });
+  const unissued = await seedRegistration({ id: 'unissued', registrationId: 'VYR26-UNISSUED' });
+  await unissued.update({ fullName: 'Abdul Unissued' });
+  const staff = { ...admin, role };
+  for (const [search, count] of [['aBDuL', 3], ['basith', 2], ['Abdul Basith', 2], ['  Abdul   Basith  ', 2], ['Nobody', 0]]) {
+    const result = await checkins.searchParticipants({ search }, staff);
+    assert.equal(result.participants.length, count);
+    for (const participant of result.participants) {
+      assert.deepEqual(Object.keys(participant).sort(), ['accommodationGroup', 'fullName', 'registrationDocId', 'registrationId', 'workshopId']);
+      assert.equal(participant.accommodationGroup, 'SANJOSE');
+    }
+  }
+  assert.equal((await checkins.searchParticipants({ search: 'Basith' }, staff)).participants[0].registrationDocId, 'name-a');
+  assert.deepEqual(await checkins.searchParticipants({ search: '' }, staff), { participants: [] });
+  await assert.rejects(checkins.searchParticipants({ search: 'Abdul' }, null), { code: 'FORBIDDEN' });
+  await assert.rejects(checkins.searchParticipants({ search: 'Abdul' }, { uid: 'x', role: 'PARTICIPANT' }), { code: 'FORBIDDEN' });
+  await assert.rejects(checkins.searchParticipants({ search: ['Abdul'] }, staff), { code: 'INVALID_CHECKIN_REQUEST' });
+});
+
+for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) {
+  test(`manual ${type} uses canonical attendance, duplicate result, and summary`, async () => {
+    const ref = await seedRegistration({ accommodation: { isHosteller: true, hostel: 'SANTHOME' } });
+    const issued = await tickets.issueForRegistrationRef(ref);
+    const selection = { type, ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
+      ...(['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT'].includes(type) ? { accommodationGroup: 'SANTHOME' } : {}) };
+    const before = await checkins.summary(selection, admin);
+    assert.equal(before.expected, 1); assert.equal(before.remainingCount, 1);
+    const manual = await checkins.checkIn({ registrationDocId: ref.id, ...selection }, admin);
+    assert.equal(manual.outcome, 'CHECKED_IN');
+    const duplicate = await checkins.checkIn({ registrationDocId: ref.id, ...selection }, admin);
+    assert.equal(duplicate.outcome, 'ALREADY_CHECKED_IN');
+    assert.equal(duplicate.checkedInAt, manual.checkedInAt);
+    const qrDuplicate = await checkins.checkIn({ ticketToken: issued.ticketPayload, ...selection }, admin);
+    assert.deepEqual(qrDuplicate, duplicate);
+    const after = await checkins.summary(selection, admin);
+    assert.equal(after.expected, 1); assert.equal(after.scanned, 1); assert.equal(after.remainingCount, 0);
+    assert.deepEqual(after.remaining, []);
+    const stored = (await db.collection('checkins').get()).docs;
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].data().checkedInBy, admin.uid);
+    assert.equal(stored[0].data().registrationDocId, ref.id);
+    assert.equal(stored[0].data().ticketId, issued.ticket.ticketId);
+  });
+}
+
+test('manual selection preserves workshop and accommodation mismatch errors with no write', async () => {
+  const ref = await seedRegistration({ accommodation: { isHosteller: true, hostel: 'ALPHONSA' } });
+  await tickets.issueForRegistrationRef(ref);
+  await assert.rejects(checkins.checkIn({ registrationDocId: ref.id, type: 'WORKSHOP', workshopId: 'data-science' }, admin), { code: 'WORKSHOP_MISMATCH' });
+  for (const type of ['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT']) {
+    await assert.rejects(checkins.checkIn({ registrationDocId: ref.id, type, accommodationGroup: 'SANTHOME' }, admin),
+      (error) => error.code === 'ACCOMMODATION_GROUP_MISMATCH' && error.details.registeredGroup === 'ALPHONSA' && error.details.selectedGroup === 'SANTHOME');
+  }
+  assert.equal((await db.collection('checkins').get()).size, 0);
+});
+
+test('manual field trip departure and return remain independent', async () => {
+  const ref = await seedRegistration(); await tickets.issueForRegistrationRef(ref);
+  for (const type of ['FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN']) {
+    assert.equal((await checkins.checkIn({ registrationDocId: ref.id, type }, admin)).outcome, 'CHECKED_IN');
+  }
+  assert.equal((await db.collection('checkins').get()).size, 2);
+});
+
+test('QR and manual requests racing share exactly one deterministic attendance record', async () => {
+  const ref = await seedRegistration(); const issued = await tickets.issueForRegistrationRef(ref);
+  const results = await Promise.all(Array.from({ length: 10 }, (_, index) => checkins.checkIn({
+    ...(index % 2 ? { registrationDocId: ref.id } : { ticketToken: issued.ticketPayload }), type: 'EVENT',
+  }, admin)));
+  assert.equal(results.filter((item) => item.outcome === 'CHECKED_IN').length, 1);
+  assert.equal(results.filter((item) => item.outcome === 'ALREADY_CHECKED_IN').length, 9);
+  assert.equal((await db.collection('checkins').get()).size, 1);
+});
+
+test('manual selection revalidates eligibility and ticket integrity after search', async () => {
+  const ref = await seedRegistration(); await tickets.issueForRegistrationRef(ref);
+  const input = { registrationDocId: ref.id, type: 'EVENT' };
+  for (const patch of [{ paymentStatus: 'PENDING' }, { registrationStatus: 'CANCELLED' }]) {
+    await ref.update(patch);
+    await assert.rejects(checkins.checkIn(input, admin), { code: 'REGISTRATION_NOT_CONFIRMED' });
+    await ref.update({ paymentStatus: 'PAID', registrationStatus: 'CONFIRMED' });
+  }
+  await db.doc(`tickets/${ref.id}`).update({ active: false });
+  await assert.rejects(checkins.checkIn(input, admin), { code: 'TICKET_REVOKED' });
+  await db.doc(`tickets/${ref.id}`).update({ active: true });
+  await ref.update({ ticketIssued: false });
+  await assert.rejects(checkins.checkIn(input, admin), { code: 'INVALID_TICKET' });
+  await ref.update({ ticketIssued: true });
+  await db.doc(`tickets/${ref.id}`).update({ registrationDocId: 'another-registration' });
+  await assert.rejects(checkins.checkIn(input, admin), { code: 'INVALID_TICKET' });
+  for (const invalid of [{ fullName: 'Ticket Participant', type: 'EVENT' }, { ...input, ticketToken: 'x' },
+    { ...input, registrationDocId: '../x' }, { ...input, registrationDocId: '' }]) {
+    await assert.rejects(checkins.checkIn(invalid, admin), { code: 'INVALID_CHECKIN_REQUEST' });
+  }
+  await assert.rejects(checkins.checkIn(input, null), { code: 'FORBIDDEN' });
+  assert.equal((await db.collection('checkins').get()).size, 0);
+});

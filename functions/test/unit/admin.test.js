@@ -328,3 +328,46 @@ test('CSV selected columns are allowlisted, missing cells are empty, and health 
   assert.equal(all.includes('SECRET'), false);
   assert.equal(all.includes('[object Object]'), false);
 });
+
+test('attendance participant search and manual submission require active ADMIN or COORDINATOR', async () => {
+  let searches = 0; let writes = 0;
+  const makeApp = (profile) => {
+    const app = express(); app.use(express.json());
+    app.use('/api/admin', createAdminRouter({
+      authorizeAdmin: createAdminAuthorization({
+        auth: { verifyIdToken: async (token) => { if (token === 'invalid') throw new Error('invalid'); return { uid: 'staff-1' }; } }, db: fakeDb(profile),
+      }),
+      checkinService: {
+        searchParticipants: async (input, staff) => {
+          searches++; assert.equal(input.search, 'Abdul Basith'); assert.deepEqual(Object.keys(input), ['search']); assert.equal(staff.role, profile.role);
+          return { participants: [{ registrationDocId: 'internal-id', fullName: 'Abdul Basith PV', registrationId: 'VYR26-1', workshopId: 'github-ai', accommodationGroup: 'SANJOSE' }] };
+        },
+        checkIn: async (input, staff) => {
+          writes++; assert.deepEqual(input, { registrationDocId: 'internal-id', type: 'FIELD_TRIP_RETURN' }); assert.equal(staff.uid, 'staff-1');
+          return { outcome: 'CHECKED_IN' };
+        },
+      },
+    }));
+    app.use((error, req, res, next) => res.status(error.status || 500).json({ error: { code: error.code } }));
+    return app;
+  };
+  const searchPath = '/api/admin/check-ins/participants?search=Abdul%20Basith';
+  for (const [profile, token, status] of [[null, null, 401], [null, 'invalid', 401], [null, 'valid', 403],
+    [{ role: 'ADMIN', active: false }, 'valid', 403], [{ role: 'PARTICIPANT', active: true }, 'valid', 403]]) {
+    for (const method of ['get', 'post']) {
+      const req = request(makeApp(profile))[method](method === 'get' ? searchPath : '/api/admin/check-ins');
+      if (token) req.set('Authorization', `Bearer ${token}`);
+      assert.equal((await req.send({ registrationDocId: 'internal-id', type: 'FIELD_TRIP_RETURN' })).status, status);
+    }
+  }
+  assert.equal(searches, 0); assert.equal(writes, 0);
+  for (const role of ['ADMIN', 'COORDINATOR']) {
+    const app = makeApp({ role, active: true });
+    const found = await request(app).get(searchPath).set('Authorization', 'Bearer valid');
+    assert.equal(found.status, 200); assert.equal(found.body.data.participants[0].fullName, 'Abdul Basith PV');
+    const written = await request(app).post('/api/admin/check-ins').set('Authorization', 'Bearer valid')
+      .send({ registrationDocId: 'internal-id', type: 'FIELD_TRIP_RETURN' });
+    assert.equal(written.status, 200); assert.equal(written.body.data.outcome, 'CHECKED_IN');
+  }
+  assert.equal(searches, 2); assert.equal(writes, 2);
+});

@@ -167,3 +167,18 @@ for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE
     assert.deepEqual((await db.collection('registrationLocks').get()).docs.map((document) => [document.id, document.data()]), locksBefore);
     assert.equal(deliveries.length, 0);
 });
+
+for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) test(`manual ${type} check-in prevents transfer without changing state`, async () => {
+    await checkins.checkIn({ registrationDocId: registrationRef().id, type,
+      ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
+      ...(['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT'].includes(type) ? { accommodationGroup: 'ALL' } : {}) }, coordinator);
+    const detail = await transfer.detail(registrationId, admin);
+    const before = (await registrationRef().get()).data();
+    const ticketBefore = (await ticketRef().get()).data();
+    const locksBefore = (await db.collection('registrationLocks').get()).docs.map((document) => [document.id, document.data()]);
+    await assert.rejects(transfer.apply(registrationId, request(detail), admin), { code: 'TICKET_ALREADY_CHECKED_IN' });
+    assert.deepEqual((await registrationRef().get()).data(), before);
+    assert.deepEqual((await ticketRef().get()).data(), ticketBefore);
+    assert.deepEqual((await db.collection('registrationLocks').get()).docs.map((document) => [document.id, document.data()]), locksBefore);
+    assert.equal(deliveries.length, 0);
+});

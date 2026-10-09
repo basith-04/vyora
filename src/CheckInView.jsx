@@ -62,7 +62,7 @@ export default function CheckInView({ auth }) {
   useEffect(() => {
     if (!selectionKey || (checkpoint?.workshop && !workshopId)) return undefined;
     refreshSummary(selectionKey);
-    const interval = setInterval(() => refreshSummary(selectionKey, true), 15000);
+    const interval = setInterval(() => refreshSummary(selectionKey, true), 60000);
     return () => { clearInterval(interval); summaryGeneration.current += 1; };
   }, [selectionKey, checkpoint?.workshop, workshopId, refreshSummary]);
 
@@ -114,7 +114,7 @@ export default function CheckInView({ auth }) {
     {checkpoint.workshop && <label className="attendance-select">Workshop<select disabled={submitting} value={workshopId} onChange={(event) => { if (inFlight.current) return; setWorkshopId(event.target.value); scanNext(); }}><option value="">Select workshop before scanning</option>{Object.entries(workshopLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
     {checkpoint.checkout && <label className="attendance-select">Accommodation Group<select disabled={submitting} value={accommodationGroup} onChange={(event) => { if (inFlight.current) return; setAccommodationGroup(event.target.value); scanNext(); }}>{accommodationGroups.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
     <section className="admin-panel attendance-summary" aria-live="polite"><div className="panel-heading"><h3>Checkpoint progress</h3><button type="button" className="secondary-button" onClick={() => refreshSummary(selectionKey, true)} disabled={summaryState === 'refreshing' || (checkpoint.workshop && !workshopId)}>Refresh</button></div>
-      {checkpoint.workshop && !workshopId ? <p>Select a workshop to see its attendance.</p> : <><p className={summaryState === 'stale' ? 'attendance-stale' : 'attendance-status'}>{summaryState === 'loading' ? 'Loading current attendance…' : summaryState === 'refreshing' ? 'Refreshing attendance…' : summaryState === 'stale' ? `Attendance may be stale. ${summaryError}` : 'Current as of last refresh · updates every 15 seconds'}</p>
+      {checkpoint.workshop && !workshopId ? <p>Select a workshop to see its attendance.</p> : <><p className={summaryState === 'stale' ? 'attendance-stale' : 'attendance-status'}>{summaryState === 'loading' ? 'Loading current attendance…' : summaryState === 'refreshing' ? 'Refreshing attendance…' : summaryState === 'stale' ? `Attendance may be stale. ${summaryError}` : 'Current as of last refresh · updates every 60 seconds'}</p>
         {visibleSummary && <div className="attendance-metrics"><div><span>Expected</span><strong>{visibleSummary.expected}</strong></div><div><span>{checkpoint.action}</span><strong>{visibleSummary.scanned}</strong></div><div><span>Remaining</span><strong>{visibleSummary.remainingCount}</strong></div></div>}</>}
     </section>
     <div className="checkin-layout"><section className={`checkin-control mode-${checkpoint.type.toLowerCase()}`}><div className="active-mode-banner"><strong>{checkpoint.banner}</strong><span>{manualParticipant && !result && !submitting ? 'Manual confirmation · camera paused' : scannerReady ? 'Scanner ready' : submitting ? 'Processing…' : result ? 'Result ready · scan next to continue' : 'Select required options'}</span></div>

@@ -10,11 +10,14 @@ const days = [
     isoDate: '2026-10-09',
     tone: 'orange',
     entries: [
-      { start: '5:00 PM', end: '5:30 PM', title: 'ARRIVAL', detail: 'Registration' },
-      { start: '6:00 PM', end: '6:30 PM', title: 'SYSTEM START', detail: 'Inauguration' },
-      { start: '6:30 PM', end: '7:30 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk', notes: ['Prof. Muhammed Kasim S', 'Former IEEE Kerala Section Chairperson'] },
-      { start: '7:30 PM', end: '8:00 PM', title: 'REFUEL', detail: 'Dinner' },
-      { start: '8:30 PM', end: '9:30 PM', title: 'NIGHT MODE', detail: 'Ice Breaking · IEEE WIE', notes: ['Musical Night'], terminal: true },
+      { start: '4:30 PM', title: 'ARRIVAL', detail: 'Registration' },
+      { start: '5:50 PM', title: 'SYSTEM START', detail: 'Inauguration Ceremony' },
+      { start: '6:30 PM', title: 'TRANSMISSION 01', detail: 'Technical Talk' },
+      { start: '7:10 PM', title: 'REFUEL', detail: 'Dinner' },
+      { start: '8:00 PM', title: 'NIGHT MODE', detail: 'Ice-Breaking Session' },
+      { start: '8:40 PM', title: 'BEYOND CONSCIOUS' },
+      { start: '9:00 PM', title: 'MUSICAL NIGHT' },
+      { start: '10:00 PM', title: 'HOSTEL DROP-OFF', terminal: true },
     ],
   },
   {
@@ -24,26 +27,66 @@ const days = [
     isoDate: '2026-10-10',
     tone: 'blue',
     entries: [
-      { start: '8:15 AM', end: '9:00 AM', title: 'BREAKFAST', compact: true },
+      { start: '7:45 AM', title: 'BREAKFAST', compact: true },
+      { start: '8:50 AM', title: 'WORKSHOP CHECK-IN', compact: true },
       {
-        start: '9:00 AM', end: '10:30 PM', title: 'PARALLEL WORKSHOPS', kind: 'workshops',
+        start: '9:00 AM',
+        title: 'PARALLEL WORKSHOPS',
+        kind: 'workshops',
         tracks: [
-          { number: '01', title: 'DATA SCIENCE AND ANALYTICS USING PYTHON', people: 'Sreeram M R', tone: 'orange' },
-          { number: '02', title: 'AI / ML / DATA SCIENCE', people: 'Abhinav I · Usmanul Faris K S · Abhiram M S ', tone: 'blue' },
-          { number: '03', title: 'GITHUB × AI', people: 'Josin Joseph · Samanway T K ', tone: 'green' },
+          {
+            number: '01',
+            title: 'DATA SCIENCE AND ANALYTICS USING PYTHON',
+            people: 'Sreeram M R',
+            tone: 'orange',
+          },
+          {
+            number: '02',
+            title: 'AI / ML / DATA SCIENCE',
+            people: 'Abhinav I · Usmanul Faris K S · Abhiram M S',
+            tone: 'blue',
+          },
+          {
+            number: '03',
+            title: 'GITHUB × AI',
+            people: 'Josin Joseph · Samanway T K',
+            tone: 'green',
+          },
         ],
       },
-      { start: '10:30 PM', end: '12:30 PM', title: 'TREASURE HUNT', compact: true },
-
-      { start: '12:30 PM', end: '1:30 PM', title: 'LUNCH BREAK', compact: true },
-      { start: '1:30 PM', end: '2:30 PM', title: 'TECHNICAL TALK 01', detail: 'Dr. P. Santhi Thilagam', notes: ['Professor, NITK Surathkal'] },
-      { start: '2:30 PM', end: '3:30 PM', title: 'TECHNICAL TALK 02', detail: 'Ms. Aleena K Shibu', notes: ['Izado Solutions · BMS Application Engineer'] },
-      { start: '3:30 PM', end: '8:00 PM', title: 'TREKKING & CAMPFIRE', detail: 'Palakkayam Thattu', notes: ['Merciful Jesus Church, Kanakakunnu'] },
-      { start: '8:30 PM', end: '9:00 PM', title: 'EVENT CONCLUDES', compact: true, terminal: true },
+      { start: '10:00 AM', title: 'PANEL DISCUSSION', compact: true },
+      { start: '10:30 AM', title: 'TREASURE HUNT', compact: true },
+      { start: '12:00 PM', title: 'LUNCH', compact: true },
+      { start: '1:00 PM', title: 'TECHNICAL TALK' },
+      {
+        start: '2:00 PM',
+        title: 'BOARDING',
+        detail: 'Palakayam Thattu Trekking',
+      },
+      {
+        start: '6:00 PM',
+        title: 'RETURN TO COLLEGE',
+        compact: true,
+      },
+      {
+        start: '7:15 PM',
+        title: 'CAMPFIRE',
+      },
+      {
+        start: '8:30 PM',
+        title: 'REELS PROJECTION',
+        detail: 'Winner Selection',
+      },
+      { start: '9:00 PM', title: 'DINNER', compact: true },
+      {
+        start: '10:00 PM',
+        title: 'EVENT CONCLUDES',
+        compact: true,
+        terminal: true,
+      },
     ],
   },
 ];
-
 function WorkshopGroup({ tracks }) {
   return (
     <ul className="workshop-tracks" aria-label="Three parallel workshop tracks">

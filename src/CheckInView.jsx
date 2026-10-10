@@ -13,7 +13,7 @@ function Result({ result, checkpoint, selectedWorkshop, onNext, onRetry, manual 
   return <section className={`checkin-result result-${presentation.kind}`} role="status" aria-live="assertive">
     <strong className="attendance-active-label">{checkpoint.banner}</strong>
     <span className="result-icon" aria-hidden="true">{presentation.icon}</span><h2>{presentation.title}</h2>
-    {participant && <><strong className="result-name">{participant.fullName}</strong><span>{participant.registrationId}</span><span>Workshop: {workshopLabels[participant.workshopId] || participant.workshopId}</span></>}
+    {participant && <><strong className="result-name">{participant.fullName}</strong><span>{participant.registrationId}</span><span>Workshop: {workshopLabels[participant.workshopId] || participant.workshopId}</span>{checkpoint.workshop && participant.day1Absent === true && <small className="attendance-absence">DAY 1 ABSENT</small>}</>}
     {result?.checkedInAt && <span>{result.outcome === 'ALREADY_CHECKED_IN' ? 'Previously recorded' : 'Recorded'}: {formatDate(result.checkedInAt)}</span>}
     {result?.code === 'WORKSHOP_MISMATCH' && <div className="wrong-workshop"><span>Participant registered for: <strong>{workshopLabels[result.details?.registeredWorkshopId]}</strong></span><span>Scanner set to: <strong>{workshopLabels[selectedWorkshop]}</strong></span></div>}
     {result?.code === 'ACCOMMODATION_GROUP_MISMATCH' && <div className="wrong-workshop"><span>No checkout was recorded.</span><span>Participant belongs to: <strong>{groupLabel(result.details?.registeredGroup)}</strong></span><span>Selected group: <strong>{groupLabel(result.details?.selectedGroup)}</strong></span></div>}

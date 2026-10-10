@@ -261,9 +261,13 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
       const attended = DAY2_PREREQUISITES[selected.type] ? attendanceSets(checkinsSnapshot.docs).get(selected.type) || new Set() : new Set(checkinsSnapshot.docs
         .filter((doc) => selected.type !== CHECKIN_TYPE.workshop || doc.data().workshopId === selected.workshopId)
         .map((doc) => doc.data().registrationDocId));
+      const checkinTimes = new Map(checkinsSnapshot.docs
+        .filter((doc) => selected.type !== CHECKIN_TYPE.workshop || doc.data().workshopId === selected.workshopId)
+        .map((doc) => [doc.data().registrationDocId, doc.data().checkedInAt]));
       let expected = 0;
       let scanned = 0;
       const remaining = [];
+      const scannedParticipants = [];
       for (const doc of registrationsSnapshot.docs) {
         const registration = doc.data();
         if (!isPaidConfirmed(registration)) continue;
@@ -272,15 +276,16 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
         if (CHECKOUT_TYPES.has(selected.type) && selected.accommodationGroup !== CHECKOUT_GROUP.all
           && accommodationGroup(registration) !== selected.accommodationGroup) continue;
         expected += 1;
-        if (attended.has(doc.id)) { scanned += 1; continue; }
-        remaining.push({ fullName: registration.fullName, registrationId: registration.registrationId, phone: registration.phone ?? null,
+        const participant = { fullName: registration.fullName, registrationId: registration.registrationId, phone: registration.phone ?? null,
           accommodationGroup: accommodationGroup(registration),
           ...(accommodationGroup(registration) === CHECKOUT_GROUP.stay ? { stayType: registration.stayType ?? null } : {}),
-          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId, day1Absent: !sets.get(CHECKIN_TYPE.event)?.has(doc.id) } : {}) });
+          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId, day1Absent: !sets.get(CHECKIN_TYPE.event)?.has(doc.id) } : {}) };
+        if (attended.has(doc.id)) { scanned += 1; scannedParticipants.push({ ...participant, checkedInAt: iso(checkinTimes.get(doc.id)) ?? null }); continue; }
+        remaining.push(participant);
       }
       remaining.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.registrationId.localeCompare(b.registrationId));
       return { type: selected.type, workshopId: selected.workshopId, accommodationGroup: selected.accommodationGroup,
-        expected, scanned, remainingCount: expected - scanned, remaining };
+        expected, scanned, remainingCount: expected - scanned, remaining, scannedParticipants };
     },
   };
 }

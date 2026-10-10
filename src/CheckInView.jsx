@@ -6,6 +6,7 @@ import { loadAttendanceSummary, submitCheckin } from './adminApi.js';
 import { checkinPresentation, createScanGate, canRetryCheckin } from './checkinUi.js';
 import { formatDate, workshopLabels } from './adminData.js';
 import { accommodationGroups, checkpoints, groupLabel } from './attendanceConfig.js';
+import { canExportAttendance, downloadAttendanceCsv } from './attendanceCsv.js';
 
 function Result({ result, checkpoint, selectedWorkshop, onNext, onRetry, manual }) {
   const presentation = checkinPresentation(result);
@@ -114,7 +115,7 @@ export default function CheckInView({ auth }) {
     <div className="attendance-heading"><p className="admin-kicker">DAY {checkpoint.day} // ACTIVE CHECKPOINT</p><h2>{checkpoint.banner}</h2></div>
     {checkpoint.workshop && <label className="attendance-select">Workshop<select disabled={submitting} value={workshopId} onChange={(event) => { if (inFlight.current) return; setWorkshopId(event.target.value); scanNext(); }}><option value="">Select workshop before scanning</option>{Object.entries(workshopLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
     {checkpoint.checkout && <label className="attendance-select">Accommodation Group<select disabled={submitting} value={accommodationGroup} onChange={(event) => { if (inFlight.current) return; setAccommodationGroup(event.target.value); scanNext(); }}>{accommodationGroups.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
-    <section className="admin-panel attendance-summary" aria-live="polite"><div className="panel-heading"><h3>Checkpoint progress</h3><button type="button" className="secondary-button" onClick={() => refreshSummary(selectionKey, true)} disabled={summaryState === 'refreshing' || (checkpoint.workshop && !workshopId)}>Refresh</button></div>
+    <section className="admin-panel attendance-summary" aria-live="polite"><div className="panel-heading"><h3>Checkpoint progress</h3><div className="attendance-summary-actions"><button type="button" className="secondary-button" onClick={() => refreshSummary(selectionKey, true)} disabled={summaryState === 'refreshing' || (checkpoint.workshop && !workshopId)}>Refresh</button><button type="button" className="secondary-button" onClick={() => downloadAttendanceCsv(visibleSummary)} disabled={submitting || summaryState !== 'ready' || !canExportAttendance(visibleSummary)}>DOWNLOAD CSV</button></div></div>
       {checkpoint.workshop && !workshopId ? <p>Select a workshop to see its attendance.</p> : <><p className={summaryState === 'stale' ? 'attendance-stale' : 'attendance-status'}>{summaryState === 'loading' ? 'Loading current attendance…' : summaryState === 'refreshing' ? 'Refreshing attendance…' : summaryState === 'stale' ? `Attendance may be stale. ${summaryError}` : 'Current as of last refresh · updates every 60 seconds'}</p>
         {visibleSummary && <div className="attendance-metrics"><div><span>Expected</span><strong>{visibleSummary.expected}</strong></div><div><span>{checkpoint.action}</span><strong>{visibleSummary.scanned}</strong></div><div><span>Remaining</span><strong>{visibleSummary.remainingCount}</strong></div></div>}</>}
     </section>

@@ -319,6 +319,10 @@ for (const role of ['ADMIN', 'COORDINATOR']) test(`${role} uses authoritative Da
     if (selection.type === 'WORKSHOP') assert.equal(response.body.data.participant.day1Absent, true);
     const summary = await request(app).get(`/api/admin/check-ins/summary?${new URLSearchParams(selection)}`).set('Authorization', authorization);
     assert.deepEqual([summary.body.data.expected, summary.body.data.scanned, summary.body.data.remainingCount], [1, 1, 0]);
+    assert.equal(summary.body.data.scannedParticipants.length, 1);
+    assert.equal(summary.body.data.scannedParticipants[0].phone, '9876543210');
+    assert.match(summary.body.data.scannedParticipants[0].checkedInAt, /^2026-09-19T11:05:00/);
+    assert.doesNotMatch(JSON.stringify(summary.body.data), /healthSafety|qrToken|recoveryToken|razorpay|email/);
   }
 });
 

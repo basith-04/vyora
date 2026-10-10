@@ -121,6 +121,8 @@
 .attendance-metrics div { display: grid; gap: .2rem; background: #e6f6ee; padding: .8rem; }
 .attendance-metrics strong { font-size: clamp(1.5rem, 4vw, 2.4rem); }
 .attendance-status { color: #355b62; }
+.attendance-summary .panel-heading { flex-wrap: wrap; }
+.attendance-summary-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .attendance-stale { color: #a33718; font-weight: 800; }
 .attendance-absence { display: inline-block; width: fit-content; padding: .2rem .4rem; border: 1px solid #a33718; color: #a33718; font-size: .7rem; font-weight: 800; }
 .attendance-remaining ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: .5rem; list-style: none; padding: 0; }

@@ -43,9 +43,27 @@ test('pending participant renders a compact disclosure with independent contact 
     const html = renderToStaticMarkup(React.createElement(PendingParticipant, { participant, checkout: true }));
     assert.match(html, /<details class="pending-contact"><summary>/);
     assert.doesNotMatch(html, /<details[^>]*open|CHECK IN|CHECK-IN/);
-    assert.match(html, /Participant With A Long Name/); assert.match(html, /VYR26-CONTACT/); assert.match(html, /Santhome/);
+    assert.match(html, /Participant With A Long Name/); assert.match(html, /VYR26-CONTACT/); assert.match(html, /SANTHOME/);
     assert.match(html, /href="tel:\+919876543210"/); assert.match(html, />CALL<\/a>/);
     assert.match(html, /type="button" class="secondary-button">COPY NUMBER/);
+  } finally { await vite.close(); }
+});
+
+test('every pending card shows compact accommodation metadata directly below its registration ID', async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: { server: new EventEmitter() } }, appType: 'custom' });
+  try {
+    const { default: PendingParticipant } = await vite.ssrLoadModule('/src/PendingParticipant.jsx');
+    for (const [accommodationGroup, stayType, label] of [
+      ['SANJOSE', null, 'SANJOSE'], ['SANTHOME', null, 'SANTHOME'], ['HOLY_CROSS', null, 'HOLY CROSS'],
+      ['ALPHONSA', null, 'ALPHONSA'], ['PG_HOUSE_NEAR_COLLEGE', null, 'PG / HOUSE NEAR COLLEGE'],
+      ['STAY', 'AC', 'STAY • AC'], ['STAY', 'NON_AC', 'STAY • NON-AC'], ['STAY', null, 'STAY'], [null, null, 'NO STAY'],
+    ]) {
+      const html = renderToStaticMarkup(React.createElement(PendingParticipant, { participant: {
+        fullName: 'Participant', registrationId: 'VYR26-METADATA', phone: '9876543210', accommodationGroup, stayType, day1Absent: true,
+      } }));
+      assert.ok(html.includes(`<span>VYR26-METADATA</span><small>${label}</small><small class="attendance-absence">DAY 1 ABSENT</small>`));
+      assert.match(html, /CONTACT ▾/); assert.match(html, /href="tel:9876543210"/); assert.match(html, /COPY NUMBER/);
+    }
   } finally { await vite.close(); }
 });
 

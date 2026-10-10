@@ -274,8 +274,9 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
         expected += 1;
         if (attended.has(doc.id)) { scanned += 1; continue; }
         remaining.push({ fullName: registration.fullName, registrationId: registration.registrationId, phone: registration.phone ?? null,
-          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId, day1Absent: !sets.get(CHECKIN_TYPE.event)?.has(doc.id) } : {}),
-          ...(CHECKOUT_TYPES.has(selected.type) ? { accommodationGroup: accommodationGroup(registration) } : {}) });
+          accommodationGroup: accommodationGroup(registration),
+          ...(accommodationGroup(registration) === CHECKOUT_GROUP.stay ? { stayType: registration.stayType ?? null } : {}),
+          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId, day1Absent: !sets.get(CHECKIN_TYPE.event)?.has(doc.id) } : {}) });
       }
       remaining.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.registrationId.localeCompare(b.registrationId));
       return { type: selected.type, workshopId: selected.workshopId, accommodationGroup: selected.accommodationGroup,

@@ -334,7 +334,9 @@ test('attendance summary allows active ADMIN and COORDINATOR with minimal partic
     const response = await request(app).get(path).set('Authorization', `Bearer ${token}`);
     assert.equal(response.status, 200);
     assert.deepEqual([response.body.data.expected, response.body.data.scanned, response.body.data.remainingCount], [1, 0, 1]);
-    assert.deepEqual(Object.keys(response.body.data.remaining[0]).sort(), ['fullName', 'phone', 'registrationId']);
+    assert.deepEqual(Object.keys(response.body.data.remaining[0]).sort(), ['accommodationGroup', 'fullName', 'phone', 'registrationId', 'stayType']);
+    assert.equal(response.body.data.remaining[0].accommodationGroup, 'STAY');
+    assert.equal(response.body.data.remaining[0].stayType, 'NON_AC');
     assert.equal(response.body.data.remaining[0].phone, '9876543210');
     assert.doesNotMatch(JSON.stringify(response.body.data), /email|healthSafety|qrToken|ticketPayload|viewToken|recoveryToken|razorpay|PRIVATE/);
     if (role === 'COORDINATOR') {

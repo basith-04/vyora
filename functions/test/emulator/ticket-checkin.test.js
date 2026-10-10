@@ -293,6 +293,9 @@ test('checkout group mappings enforce current assignment without changing checko
   for (const [index, item] of cases.entries()) {
     const ref = await seedRegistration({ id: `group-${index}`, registrationId: `VYR26-${String(index).padStart(20, '0')}`, accommodation: item.accommodation });
     const ticket = await tickets.issueForRegistrationRef(ref);
+    const pending = (await checkins.summary({ type: 'EVENT' }, admin)).remaining.find((item) => item.registrationId === ticket.registration.registrationId);
+    assert.equal(pending.accommodationGroup, item.group);
+    assert.equal(pending.stayType, item.group === 'STAY' ? item.accommodation.stayType : undefined);
     await assert.rejects(checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'DAY1_CHECK_OUT', accommodationGroup: item.group === 'SANJOSE' ? 'SANTHOME' : 'SANJOSE' }, admin),
       { code: 'ACCOMMODATION_GROUP_MISMATCH' });
     assert.equal((await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'DAY1_CHECK_OUT', accommodationGroup: item.group }, admin)).outcome, 'CHECKED_IN');
@@ -314,7 +317,8 @@ test('summary derives expected, scanned and remaining from eligible registration
   assert.deepEqual([workshop.expected, workshop.scanned, workshop.remainingCount], [1, 0, 1]);
   assert.equal(workshop.remaining[0].phone, '+91 98765-43211');
   assert.equal(workshop.remaining[0].day1Absent, true);
-  assert.deepEqual(Object.keys(workshop.remaining[0]).sort(), ['day1Absent', 'fullName', 'phone', 'registrationId', 'workshopId']);
+  assert.equal(workshop.remaining[0].accommodationGroup, 'STAY'); assert.equal(workshop.remaining[0].stayType, 'NON_AC');
+  assert.deepEqual(Object.keys(workshop.remaining[0]).sort(), ['accommodationGroup', 'day1Absent', 'fullName', 'phone', 'registrationId', 'stayType', 'workshopId']);
   await beta.update({ phone: null });
   assert.equal((await checkins.summary({ type: 'WORKSHOP', workshopId: 'data-science' }, admin)).remaining[0].phone, null);
   await beta.update({ phone: '+91 98765-43211' });
@@ -328,7 +332,7 @@ test('summary derives expected, scanned and remaining from eligible registration
   assert.deepEqual([returning.expected, returning.scanned, returning.remainingCount], [1, 0, 1]);
   assert.deepEqual(returning.remaining.map((item) => item.registrationId), ['VYR26-ALPHA']);
   assert.deepEqual(departure.remaining.map((item) => item.registrationId), ['VYR26-BETA']);
-  assert.deepEqual(Object.keys(departure.remaining[0]).sort(), ['fullName', 'phone', 'registrationId']);
+  assert.deepEqual(Object.keys(departure.remaining[0]).sort(), ['accommodationGroup', 'fullName', 'phone', 'registrationId', 'stayType']);
   assert.equal(departure.remaining[0].phone, '+91 98765-43211');
   assert.doesNotMatch(JSON.stringify(returning.remaining), /email|healthSafety|qrToken|ticketPayload|viewToken|recoveryToken|razorpay|PRIVATE/);
   const santhome = await checkins.summary({ type: 'DAY1_CHECK_OUT', accommodationGroup: 'SANTHOME' }, admin);
@@ -336,7 +340,8 @@ test('summary derives expected, scanned and remaining from eligible registration
   assert.deepEqual([santhome.expected, santhome.scanned, stay.expected, stay.scanned], [1, 1, 1, 0]);
   assert.equal(stay.remaining[0].accommodationGroup, 'STAY');
   assert.equal(stay.remaining[0].phone, '+91 98765-43211');
-  assert.deepEqual(Object.keys(stay.remaining[0]).sort(), ['accommodationGroup', 'fullName', 'phone', 'registrationId']);
+  assert.equal(stay.remaining[0].stayType, 'NON_AC');
+  assert.deepEqual(Object.keys(stay.remaining[0]).sort(), ['accommodationGroup', 'fullName', 'phone', 'registrationId', 'stayType']);
   await db.doc('checkins/outside-population').set({ type: 'FIELD_TRIP_DEPARTURE', registrationDocId: 'unrelated' });
   assert.equal((await checkins.summary({ type: 'FIELD_TRIP_DEPARTURE' }, admin)).scanned, 1);
   assert.deepEqual(Object.keys(stay).sort(), ['accommodationGroup', 'expected', 'remaining', 'remainingCount', 'scanned', 'type', 'workshopId']);
@@ -416,6 +421,7 @@ for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE
     const before = await checkins.summary(selection, admin);
     assert.equal(before.expected, 1); assert.equal(before.remainingCount, 1);
     assert.equal(before.remaining[0].phone, '9876543210');
+    assert.equal(before.remaining[0].accommodationGroup, 'SANTHOME');
     const manual = await checkins.checkIn({ registrationDocId: ref.id, ...selection }, admin);
     assert.equal(manual.outcome, 'CHECKED_IN');
     const duplicate = await checkins.checkIn({ registrationDocId: ref.id, ...selection }, admin);
@@ -500,6 +506,7 @@ test('Day 1 absence is derived by canonical identity and never blocks or mutates
   await db.doc('checkins/not-canonical-event').set({ type: 'EVENT', workshopId: null, registrationDocId: absent.id });
   const snapshots = await Promise.all([present.get(), absent.get(), db.doc(`tickets/${present.id}`).get(), db.doc(`tickets/${absent.id}`).get()]);
   const summary = await checkins.summary({ type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  assert.ok(summary.remaining.every((item) => item.accommodationGroup === null && !Object.hasOwn(item, 'stayType')));
   const flags = new Map(summary.remaining.map((item) => [item.registrationId, item.day1Absent]));
   assert.equal(flags.get('VYR26-PRESENT'), false); assert.equal(flags.get('VYR26-ABSENT'), true);
   const attended = await checkins.checkIn({ ticketToken: presentTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);

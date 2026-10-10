@@ -152,7 +152,17 @@ test('duplicate email, duplicate phone, arbitrary fields, and coordinator are re
   assert.equal((await ticketRef().get()).data().credentialVersion, undefined);
 });
 
+async function attendDay2Prerequisites(type) {
+  if (['FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT'].includes(type)) {
+    await checkins.checkIn({ registrationDocId: registrationRef().id, type: 'WORKSHOP', workshopId: 'github-ai' }, coordinator);
+  }
+  if (type === 'FIELD_TRIP_RETURN') {
+    await checkins.checkIn({ registrationDocId: registrationRef().id, type: 'FIELD_TRIP_DEPARTURE' }, coordinator);
+  }
+}
+
 for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) test(`${type} check-in prevents transfer without changing state`, async () => {
+    await attendDay2Prerequisites(type);
     const issued = await tickets.existingForRegistrationRef(registrationRef());
     await checkins.checkIn({ ticketToken: issued.ticketPayload, type,
       ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
@@ -169,6 +179,7 @@ for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE
 });
 
 for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) test(`manual ${type} check-in prevents transfer without changing state`, async () => {
+    await attendDay2Prerequisites(type);
     await checkins.checkIn({ registrationDocId: registrationRef().id, type,
       ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
       ...(['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT'].includes(type) ? { accommodationGroup: 'ALL' } : {}) }, coordinator);

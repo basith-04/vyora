@@ -61,3 +61,18 @@ test('unusable pending phone disables both actions and renders a clear message',
     }
   } finally { await vite.close(); }
 });
+
+test('Workshop pending rows show only derived Day 1 absence while preserving contact actions', async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: { server: new EventEmitter() } }, appType: 'custom' });
+  try {
+    const { default: PendingParticipant } = await vite.ssrLoadModule('/src/PendingParticipant.jsx');
+    for (const day1Absent of [true, false, undefined]) {
+      const html = renderToStaticMarkup(React.createElement(PendingParticipant, { participant: {
+        fullName: 'Workshop Participant', registrationId: 'VYR26-WORKSHOP', phone: '9876543210', day1Absent,
+      } }));
+      assert.equal(html.includes('DAY 1 ABSENT'), day1Absent === true);
+      assert.match(html, /href="tel:9876543210"/);
+      assert.match(html, /COPY NUMBER/);
+    }
+  } finally { await vite.close(); }
+});

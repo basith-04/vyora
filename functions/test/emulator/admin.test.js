@@ -293,8 +293,37 @@ test('check-in API requires staff authorization and ignores no client-supplied s
   assert.equal(stored.checkedInBy, user.uid);
 });
 
+for (const role of ['ADMIN', 'COORDINATOR']) test(`${role} uses authoritative Day 2 prerequisites through QR and canonical manual selection`, async () => {
+  const issued = await ticketService.issueForRegistrationRef(db.doc('registrations/reg-1'));
+  const { user, token } = await createIdentity(`day2-${role.toLowerCase()}@example.com`);
+  await db.doc(`admins/${user.uid}`).set({ name: role, role, active: true });
+  const authorization = `Bearer ${token}`;
+  const search = await request(app).get('/api/admin/check-ins/participants?search=Admin').set('Authorization', authorization);
+  assert.equal(search.status, 200); const registrationDocId = search.body.data.participants[0].registrationDocId;
+  const manual = { registrationDocId }; const qr = { ticketToken: issued.ticketPayload };
+  for (const [selection, code] of [[{ type: 'FIELD_TRIP_DEPARTURE' }, 'WORKSHOP_CHECKIN_REQUIRED'],
+    [{ type: 'FIELD_TRIP_RETURN' }, 'FIELD_TRIP_DEPARTURE_REQUIRED'], [{ type: 'DAY2_CHECK_OUT', accommodationGroup: 'STAY' }, 'DAY2_ATTENDANCE_REQUIRED']]) {
+    for (const identity of [qr, manual]) {
+      const rejected = await request(app).post('/api/admin/check-ins').set('Authorization', authorization).send({ ...identity, ...selection });
+      assert.equal(rejected.status, 409); assert.equal(rejected.body.error.code, code);
+    }
+  }
+  assert.equal((await db.collection('checkins').get()).size, 0);
+  const workshopSummary = await request(app).get('/api/admin/check-ins/summary?type=WORKSHOP&workshopId=github-ai').set('Authorization', authorization);
+  assert.equal(workshopSummary.body.data.remaining[0].day1Absent, true);
+  assert.equal(workshopSummary.body.data.remaining[0].phone, '9876543210');
+  for (const [index, selection] of [{ type: 'WORKSHOP', workshopId: 'github-ai' }, { type: 'DAY2_CHECK_OUT', accommodationGroup: 'STAY' },
+    { type: 'FIELD_TRIP_DEPARTURE' }, { type: 'FIELD_TRIP_RETURN' }].entries()) {
+    const response = await request(app).post('/api/admin/check-ins').set('Authorization', authorization).send({ ...(index % 2 ? manual : qr), ...selection });
+    assert.equal(response.status, 200); assert.equal(response.body.data.outcome, 'CHECKED_IN');
+    if (selection.type === 'WORKSHOP') assert.equal(response.body.data.participant.day1Absent, true);
+    const summary = await request(app).get(`/api/admin/check-ins/summary?${new URLSearchParams(selection)}`).set('Authorization', authorization);
+    assert.deepEqual([summary.body.data.expected, summary.body.data.scanned, summary.body.data.remainingCount], [1, 1, 0]);
+  }
+});
+
 test('attendance summary allows active ADMIN and COORDINATOR with minimal participant data', async () => {
-  const path = '/api/admin/check-ins/summary?type=FIELD_TRIP_RETURN';
+  const path = '/api/admin/check-ins/summary?type=EVENT';
   await db.doc('registrations/reg-1').update({ healthSafetyNote: 'PRIVATE HEALTH', ticketPayload: 'PRIVATE QR', viewTokenHash: 'PRIVATE VIEW' });
   assert.equal((await request(app).get(path)).status, 401);
   assert.equal((await request(app).get(path).set('Authorization', 'Bearer invalid')).status, 401);

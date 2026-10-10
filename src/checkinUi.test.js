@@ -6,6 +6,10 @@ test('check-in outcomes map to explicit accessible result labels', () => {
   assert.deepEqual(checkinPresentation({ outcome: 'CHECKED_IN' }), { kind: 'success', icon: '✓', title: 'CHECK-IN SUCCESSFUL' });
   assert.equal(checkinPresentation({ outcome: 'ALREADY_CHECKED_IN' }).title, 'ALREADY CHECKED IN');
   assert.equal(checkinPresentation({ code: 'WORKSHOP_MISMATCH' }).title, 'NOT REGISTERED FOR THIS WORKSHOP');
+  for (const [code, title] of [['WORKSHOP_CHECKIN_REQUIRED', 'WORKSHOP CHECK-IN REQUIRED'],
+    ['FIELD_TRIP_DEPARTURE_REQUIRED', 'FIELD TRIP DEPARTURE REQUIRED'], ['DAY2_ATTENDANCE_REQUIRED', 'DAY 2 ATTENDANCE REQUIRED']]) {
+    assert.equal(checkinPresentation({ code }).title, title);
+  }
   assert.equal(checkinPresentation({ code: 'ACCOMMODATION_GROUP_MISMATCH' }).title, 'WRONG ACCOMMODATION GROUP');
   assert.equal(checkinPresentation({ code: 'TICKET_REVOKED' }).title, 'TICKET REVOKED');
   assert.equal(checkinPresentation({ code: 'NETWORK_ERROR' }).title, 'NETWORK ERROR');

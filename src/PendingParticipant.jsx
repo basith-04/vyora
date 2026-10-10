@@ -18,7 +18,7 @@ export default function PendingParticipant({ participant, checkout }) {
 
   return <li><details className="pending-contact">
     <summary><strong>{participant.fullName}</strong><small className="pending-contact-hint">CONTACT ▾</small>
-      <span>{participant.registrationId}</span>{checkout && <small>{groupLabel(participant.accommodationGroup)}</small>}
+      <span>{participant.registrationId}</span>{participant.day1Absent === true && <small className="attendance-absence">DAY 1 ABSENT</small>}{checkout && <small>{groupLabel(participant.accommodationGroup)}</small>}
     </summary>
     <div className="pending-contact-body">
       {contact ? <span className="pending-phone">{contact.number}</span> : <small>Phone number unavailable or invalid.</small>}

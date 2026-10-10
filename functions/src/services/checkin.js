@@ -9,6 +9,16 @@ import { matchesRegistrationFilters } from '../../shared/report-filters.js';
 
 const CHECKOUT_TYPES = new Set([CHECKIN_TYPE.day1Checkout, CHECKIN_TYPE.day2Checkout]);
 const TYPES = new Set(Object.values(CHECKIN_TYPE));
+const DAY2_PREREQUISITES = {
+  [CHECKIN_TYPE.fieldTripDeparture]: [CHECKIN_TYPE.workshop],
+  [CHECKIN_TYPE.fieldTripReturn]: [CHECKIN_TYPE.fieldTripDeparture],
+  [CHECKIN_TYPE.day2Checkout]: [CHECKIN_TYPE.workshop, CHECKIN_TYPE.fieldTripDeparture, CHECKIN_TYPE.fieldTripReturn],
+};
+const PREREQUISITE_ERRORS = {
+  [CHECKIN_TYPE.fieldTripDeparture]: ['WORKSHOP_CHECKIN_REQUIRED', 'Workshop check-in is required before field-trip departure.'],
+  [CHECKIN_TYPE.fieldTripReturn]: ['FIELD_TRIP_DEPARTURE_REQUIRED', 'Field-trip departure is required before return check-in.'],
+  [CHECKIN_TYPE.day2Checkout]: ['DAY2_ATTENDANCE_REQUIRED', 'Workshop or field-trip attendance is required before Day 2 checkout.'],
+};
 
 export function accommodationGroup(registration) {
   if (registration.isHosteller === true && HOSTELS.includes(registration.hostel)) return registration.hostel;
@@ -32,11 +42,31 @@ function checkinDocumentId(type, workshopId, registrationDocId) {
     .digest('hex');
 }
 
+// Read canonical identities only; no stored absence state or mutable attendance counters.
+function attendanceSets(documents) {
+  const sets = new Map();
+  for (const doc of documents) {
+    if (!doc.exists) continue;
+    const data = doc.data();
+    if (typeof data.registrationDocId !== 'string' || !TYPES.has(data.type)
+      || (data.type === CHECKIN_TYPE.workshop ? !WORKSHOP_IDS.includes(data.workshopId) : data.workshopId != null)
+      || doc.id !== checkinDocumentId(data.type, data.workshopId, data.registrationDocId)) continue;
+    if (!sets.has(data.type)) sets.set(data.type, new Set());
+    sets.get(data.type).add(data.registrationDocId);
+  }
+  return sets;
+}
+
+function hasPrerequisite(type, registrationDocId, sets) {
+  const required = DAY2_PREREQUISITES[type];
+  return !required || required.some((prior) => sets.get(prior)?.has(registrationDocId));
+}
+
 function iso(value) {
   return value?.toDate().toISOString();
 }
 
-function participantResult(registration, checkin, outcome) {
+function participantResult(registration, checkin, outcome, day1Absent) {
   return {
     outcome,
     type: checkin.type,
@@ -47,6 +77,7 @@ function participantResult(registration, checkin, outcome) {
       registrationId: registration.registrationId,
       ieeeMember: registration.ieeeMember === true,
       workshopId: registration.workshopId,
+      ...(checkin.type === CHECKIN_TYPE.workshop ? { day1Absent } : {}),
     },
   };
 }
@@ -109,6 +140,10 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
       const checkinRef = db.collection(COLLECTIONS.checkins).doc(
         checkinDocumentId(checked.type, checked.workshopId, ticket.data.registrationDocId),
       );
+      const evidenceTypes = checked.type === CHECKIN_TYPE.workshop ? [CHECKIN_TYPE.event] : DAY2_PREREQUISITES[checked.type] || [];
+      const evidenceRefs = evidenceTypes.flatMap((type) =>
+        (type === CHECKIN_TYPE.workshop ? WORKSHOP_IDS : [null]).map((workshopId) =>
+          db.collection(COLLECTIONS.checkins).doc(checkinDocumentId(type, workshopId, registrationRef.id))));
 
       const transactionStarted = performance.now();
       timings.transactionAttempts = 0;
@@ -116,8 +151,8 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
       try {
         result = await db.runTransaction(async (transaction) => {
           timings.transactionAttempts += 1;
-          const [ticketSnapshot, registrationSnapshot, existingCheckinSnapshot] = await transaction.getAll(
-            ticket.ref, registrationRef, checkinRef,
+          const [ticketSnapshot, registrationSnapshot, existingCheckinSnapshot, ...evidence] = await transaction.getAll(
+            ticket.ref, registrationRef, checkinRef, ...evidenceRefs,
           );
           if (!ticketSnapshot.exists) throw new AppError('INVALID_TICKET', 'The ticket could not be found.', 404);
           const currentTicket = ticketSnapshot.data();
@@ -158,8 +193,14 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
             throw new AppError('ACCOMMODATION_GROUP_MISMATCH', 'Participant belongs to a different accommodation group.', 409,
               { registeredGroup: accommodationGroup(registration), selectedGroup: checked.accommodationGroup });
           }
+          const sets = attendanceSets(evidence);
+          const day1Absent = checked.type === CHECKIN_TYPE.workshop && !sets.get(CHECKIN_TYPE.event)?.has(registrationRef.id);
           if (existingCheckinSnapshot.exists) {
-            return { registration, checkin: existingCheckinSnapshot.data(), outcome: 'ALREADY_CHECKED_IN' };
+            return { registration, checkin: existingCheckinSnapshot.data(), outcome: 'ALREADY_CHECKED_IN', day1Absent };
+          }
+          if (!hasPrerequisite(checked.type, registrationRef.id, sets)) {
+            const [code, message] = PREREQUISITE_ERRORS[checked.type];
+            throw new AppError(code, message, 409);
           }
 
           const checkin = {
@@ -172,10 +213,10 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
             checkedInBy: admin.uid,
           };
           transaction.create(checkinRef, checkin);
-          return { registration, checkin, outcome: 'CHECKED_IN' };
+          return { registration, checkin, outcome: 'CHECKED_IN', day1Absent };
         });
       } finally { timings.transactionMs = performance.now() - transactionStarted; }
-      return participantResult(result.registration, result.checkin, result.outcome);
+      return participantResult(result.registration, result.checkin, result.outcome, result.day1Absent);
     },
     async searchParticipants(input, admin) {
       assertStaff(admin);
@@ -210,11 +251,14 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
     async summary(input, admin) {
       assertStaff(admin);
       const selected = validateSelection(input);
-      const [registrationsSnapshot, checkinsSnapshot] = await Promise.all([
+      const evidenceTypes = selected.type === CHECKIN_TYPE.workshop ? [CHECKIN_TYPE.event] : DAY2_PREREQUISITES[selected.type] || [];
+      const [registrationsSnapshot, checkinsSnapshot, ...evidence] = await Promise.all([
         db.collection(COLLECTIONS.registrations).get(),
         db.collection(COLLECTIONS.checkins).where('type', '==', selected.type).get(),
+        ...evidenceTypes.map((type) => db.collection(COLLECTIONS.checkins).where('type', '==', type).get()),
       ]);
-      const attended = new Set(checkinsSnapshot.docs
+      const sets = attendanceSets(evidence.flatMap((snapshot) => snapshot.docs));
+      const attended = DAY2_PREREQUISITES[selected.type] ? attendanceSets(checkinsSnapshot.docs).get(selected.type) || new Set() : new Set(checkinsSnapshot.docs
         .filter((doc) => selected.type !== CHECKIN_TYPE.workshop || doc.data().workshopId === selected.workshopId)
         .map((doc) => doc.data().registrationDocId));
       let expected = 0;
@@ -223,13 +267,14 @@ export function createCheckinService({ db, ticketService, clock = () => Date.now
       for (const doc of registrationsSnapshot.docs) {
         const registration = doc.data();
         if (!isPaidConfirmed(registration)) continue;
+        if (!hasPrerequisite(selected.type, doc.id, sets)) continue;
         if (selected.type === CHECKIN_TYPE.workshop && registration.workshopId !== selected.workshopId) continue;
         if (CHECKOUT_TYPES.has(selected.type) && selected.accommodationGroup !== CHECKOUT_GROUP.all
           && accommodationGroup(registration) !== selected.accommodationGroup) continue;
         expected += 1;
         if (attended.has(doc.id)) { scanned += 1; continue; }
         remaining.push({ fullName: registration.fullName, registrationId: registration.registrationId, phone: registration.phone ?? null,
-          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId } : {}),
+          ...(selected.type === CHECKIN_TYPE.workshop ? { workshopId: registration.workshopId, day1Absent: !sets.get(CHECKIN_TYPE.event)?.has(doc.id) } : {}),
           ...(CHECKOUT_TYPES.has(selected.type) ? { accommodationGroup: accommodationGroup(registration) } : {}) });
       }
       remaining.sort((a, b) => a.fullName.localeCompare(b.fullName) || a.registrationId.localeCompare(b.registrationId));

@@ -1,5 +1,6 @@
 import test, { after, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
@@ -61,6 +62,16 @@ before(async () => {
 });
 
 beforeEach(async () => testEnvironment.clearFirestore());
+
+// Emulator-only historical fixtures, including valid legacy departure/return-only evidence.
+async function historicalAttendance(ref, type, workshopId = null) {
+  const registration = (await ref.get()).data();
+  const id = createHash('sha256').update(`vyora26:checkin:v1:${type}:${workshopId || '-'}:${ref.id}`).digest('hex');
+  const checkinRef = db.doc(`checkins/${id}`);
+  await checkinRef.set({ registrationDocId: ref.id, registrationId: registration.registrationId, ticketId: registration.ticketId,
+    type, workshopId, checkedInAt: Timestamp.fromMillis(now - 86_400_000), checkedInBy: 'historical-staff' });
+  return checkinRef.get();
+}
 
 after(async () => {
   await testEnvironment?.cleanup();
@@ -251,7 +262,7 @@ test('credential rotation between lookup and transaction cannot accept the stale
   assert.equal((await db.collection('checkins').get()).size, 0);
 });
 
-test('all six checkpoints retain independent deterministic attendance and same-scope duplicate protection', async () => {
+test('all six checkpoint identities and duplicate protection survive Day 2 prerequisite validation', async () => {
   const ref = await seedRegistration();
   const ticket = await tickets.issueForRegistrationRef(ref);
   const selections = [
@@ -286,9 +297,10 @@ test('checkout group mappings enforce current assignment without changing checko
       { code: 'ACCOMMODATION_GROUP_MISMATCH' });
     assert.equal((await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'DAY1_CHECK_OUT', accommodationGroup: item.group }, admin)).outcome, 'CHECKED_IN');
     assert.equal((await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'DAY1_CHECK_OUT', accommodationGroup: 'ALL' }, admin)).outcome, 'ALREADY_CHECKED_IN');
+    await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
     assert.equal((await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'DAY2_CHECK_OUT', accommodationGroup: 'ALL' }, admin)).outcome, 'CHECKED_IN');
   }
-  assert.equal((await db.collection('checkins').get()).size, cases.length * 2);
+  assert.equal((await db.collection('checkins').get()).size, cases.length * 3);
 });
 
 test('summary derives expected, scanned and remaining from eligible registrations in each scope', async () => {
@@ -297,13 +309,24 @@ test('summary derives expected, scanned and remaining from eligible registration
   await beta.update({ phone: '+91 98765-43211', healthSafetyNote: 'PRIVATE HEALTH', ticketPayload: 'PRIVATE QR', viewTokenHash: 'PRIVATE VIEW' });
   await seedRegistration({ id: 'pending', registrationId: 'VYR26-PENDING', registrationStatus: 'PAYMENT_PENDING', paymentStatus: 'PENDING' });
   const alphaTicket = await tickets.issueForRegistrationRef(alpha);
-  await tickets.issueForRegistrationRef(beta);
+  const betaTicket = await tickets.issueForRegistrationRef(beta);
+  const workshop = await checkins.summary({ type: 'WORKSHOP', workshopId: 'data-science' }, admin);
+  assert.deepEqual([workshop.expected, workshop.scanned, workshop.remainingCount], [1, 0, 1]);
+  assert.equal(workshop.remaining[0].phone, '+91 98765-43211');
+  assert.equal(workshop.remaining[0].day1Absent, true);
+  assert.deepEqual(Object.keys(workshop.remaining[0]).sort(), ['day1Absent', 'fullName', 'phone', 'registrationId', 'workshopId']);
+  await beta.update({ phone: null });
+  assert.equal((await checkins.summary({ type: 'WORKSHOP', workshopId: 'data-science' }, admin)).remaining[0].phone, null);
+  await beta.update({ phone: '+91 98765-43211' });
+  await checkins.checkIn({ ticketToken: alphaTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  await checkins.checkIn({ ticketToken: betaTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'data-science' }, admin);
   await checkins.checkIn({ ticketToken: alphaTicket.ticketPayload, type: 'FIELD_TRIP_DEPARTURE' }, admin);
   await checkins.checkIn({ ticketToken: alphaTicket.ticketPayload, type: 'DAY1_CHECK_OUT', accommodationGroup: 'SANTHOME' }, admin);
   const departure = await checkins.summary({ type: 'FIELD_TRIP_DEPARTURE' }, admin);
   const returning = await checkins.summary({ type: 'FIELD_TRIP_RETURN' }, admin);
   assert.deepEqual([departure.expected, departure.scanned, departure.remainingCount], [2, 1, 1]);
-  assert.deepEqual([returning.expected, returning.scanned, returning.remainingCount], [2, 0, 2]);
+  assert.deepEqual([returning.expected, returning.scanned, returning.remainingCount], [1, 0, 1]);
+  assert.deepEqual(returning.remaining.map((item) => item.registrationId), ['VYR26-ALPHA']);
   assert.deepEqual(departure.remaining.map((item) => item.registrationId), ['VYR26-BETA']);
   assert.deepEqual(Object.keys(departure.remaining[0]).sort(), ['fullName', 'phone', 'registrationId']);
   assert.equal(departure.remaining[0].phone, '+91 98765-43211');
@@ -314,12 +337,6 @@ test('summary derives expected, scanned and remaining from eligible registration
   assert.equal(stay.remaining[0].accommodationGroup, 'STAY');
   assert.equal(stay.remaining[0].phone, '+91 98765-43211');
   assert.deepEqual(Object.keys(stay.remaining[0]).sort(), ['accommodationGroup', 'fullName', 'phone', 'registrationId']);
-  const workshop = await checkins.summary({ type: 'WORKSHOP', workshopId: 'data-science' }, admin);
-  assert.deepEqual([workshop.expected, workshop.scanned, workshop.remainingCount], [1, 0, 1]);
-  assert.equal(workshop.remaining[0].phone, '+91 98765-43211');
-  assert.deepEqual(Object.keys(workshop.remaining[0]).sort(), ['fullName', 'phone', 'registrationId', 'workshopId']);
-  await beta.update({ phone: null });
-  assert.equal((await checkins.summary({ type: 'WORKSHOP', workshopId: 'data-science' }, admin)).remaining[0].phone, null);
   await db.doc('checkins/outside-population').set({ type: 'FIELD_TRIP_DEPARTURE', registrationDocId: 'unrelated' });
   assert.equal((await checkins.summary({ type: 'FIELD_TRIP_DEPARTURE' }, admin)).scanned, 1);
   assert.deepEqual(Object.keys(stay).sort(), ['accommodationGroup', 'expected', 'remaining', 'remainingCount', 'scanned', 'type', 'workshopId']);
@@ -329,11 +346,13 @@ test('summary derives expected, scanned and remaining from eligible registration
 test('simultaneous first scans at a new checkpoint have one winner', async () => {
   const ref = await seedRegistration();
   const ticket = await tickets.issueForRegistrationRef(ref);
+  await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  await checkins.checkIn({ ticketToken: ticket.ticketPayload, type: 'FIELD_TRIP_DEPARTURE' }, admin);
   const results = await Promise.all(Array.from({ length: 6 }, (_, index) => checkins.checkIn(
     { ticketToken: ticket.ticketPayload, type: 'FIELD_TRIP_RETURN' }, { ...admin, uid: `return-staff-${index}` })));
   assert.equal(results.filter((item) => item.outcome === 'CHECKED_IN').length, 1);
   assert.equal(results.filter((item) => item.outcome === 'ALREADY_CHECKED_IN').length, 5);
-  assert.equal((await db.collection('checkins').get()).size, 1);
+  assert.equal((await db.collection('checkins').get()).size, 3);
 });
 
 test('unconfirmed or cancelled registrations cannot create field-trip attendance', async () => {
@@ -389,6 +408,11 @@ for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE
     const issued = await tickets.issueForRegistrationRef(ref);
     const selection = { type, ...(type === 'WORKSHOP' ? { workshopId: 'github-ai' } : {}),
       ...(['DAY1_CHECK_OUT', 'DAY2_CHECK_OUT'].includes(type) ? { accommodationGroup: 'SANTHOME' } : {}) };
+    if (['FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT'].includes(type)) {
+      await checkins.checkIn({ registrationDocId: ref.id, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+    }
+    if (type === 'FIELD_TRIP_RETURN') await checkins.checkIn({ registrationDocId: ref.id, type: 'FIELD_TRIP_DEPARTURE' }, admin);
+    const previousCount = (await db.collection('checkins').get()).size;
     const before = await checkins.summary(selection, admin);
     assert.equal(before.expected, 1); assert.equal(before.remainingCount, 1);
     assert.equal(before.remaining[0].phone, '9876543210');
@@ -402,7 +426,8 @@ for (const type of ['EVENT', 'WORKSHOP', 'DAY1_CHECK_OUT', 'FIELD_TRIP_DEPARTURE
     const after = await checkins.summary(selection, admin);
     assert.equal(after.expected, 1); assert.equal(after.scanned, 1); assert.equal(after.remainingCount, 0);
     assert.deepEqual(after.remaining, []);
-    const stored = (await db.collection('checkins').get()).docs;
+    assert.equal((await db.collection('checkins').get()).size, previousCount + 1);
+    const stored = (await db.collection('checkins').where('type', '==', type).get()).docs;
     assert.equal(stored.length, 1);
     assert.equal(stored[0].data().checkedInBy, admin.uid);
     assert.equal(stored[0].data().registrationDocId, ref.id);
@@ -421,12 +446,14 @@ test('manual selection preserves workshop and accommodation mismatch errors with
   assert.equal((await db.collection('checkins').get()).size, 0);
 });
 
-test('manual field trip departure and return remain independent', async () => {
+test('manual field trip uses committed Workshop then departure prerequisites', async () => {
   const ref = await seedRegistration(); await tickets.issueForRegistrationRef(ref);
+  await assert.rejects(checkins.checkIn({ registrationDocId: ref.id, type: 'FIELD_TRIP_DEPARTURE' }, admin), { code: 'WORKSHOP_CHECKIN_REQUIRED' });
+  await checkins.checkIn({ registrationDocId: ref.id, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
   for (const type of ['FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN']) {
     assert.equal((await checkins.checkIn({ registrationDocId: ref.id, type }, admin)).outcome, 'CHECKED_IN');
   }
-  assert.equal((await db.collection('checkins').get()).size, 2);
+  assert.equal((await db.collection('checkins').get()).size, 3);
 });
 
 test('QR and manual requests racing share exactly one deterministic attendance record', async () => {
@@ -461,4 +488,159 @@ test('manual selection revalidates eligibility and ticket integrity after search
   }
   await assert.rejects(checkins.checkIn(input, null), { code: 'FORBIDDEN' });
   assert.equal((await db.collection('checkins').get()).size, 0);
+});
+
+test('Day 1 absence is derived by canonical identity and never blocks or mutates Workshop participants', async () => {
+  const present = await seedRegistration({ id: 'day1-present', registrationId: 'VYR26-PRESENT' });
+  const absent = await seedRegistration({ id: 'day1-absent', registrationId: 'VYR26-ABSENT' });
+  const presentTicket = await tickets.issueForRegistrationRef(present);
+  const absentTicket = await tickets.issueForRegistrationRef(absent);
+  await checkins.checkIn({ ticketToken: presentTicket.ticketPayload, type: 'EVENT' }, admin);
+  // A lookalike noncanonical document must not substitute for EVENT evidence.
+  await db.doc('checkins/not-canonical-event').set({ type: 'EVENT', workshopId: null, registrationDocId: absent.id });
+  const snapshots = await Promise.all([present.get(), absent.get(), db.doc(`tickets/${present.id}`).get(), db.doc(`tickets/${absent.id}`).get()]);
+  const summary = await checkins.summary({ type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  const flags = new Map(summary.remaining.map((item) => [item.registrationId, item.day1Absent]));
+  assert.equal(flags.get('VYR26-PRESENT'), false); assert.equal(flags.get('VYR26-ABSENT'), true);
+  const attended = await checkins.checkIn({ ticketToken: presentTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  const noShow = await checkins.checkIn({ registrationDocId: absent.id, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  assert.equal(attended.participant.day1Absent, false);
+  assert.equal(noShow.outcome, 'CHECKED_IN'); assert.equal(noShow.participant.day1Absent, true);
+  assert.equal((await checkins.checkIn({ ticketToken: absentTicket.ticketPayload, type: 'WORKSHOP', workshopId: 'github-ai' }, admin)).participant.day1Absent, true);
+  for (const old of snapshots) {
+    const current = await old.ref.get(); assert.deepEqual(current.data(), old.data()); assert.ok(current.updateTime.isEqual(old.updateTime));
+  }
+  for (const doc of (await db.collection('checkins').get()).docs) assert.equal(doc.data().day1Absent, undefined);
+});
+
+for (const mode of ['QR', 'manual']) for (const [type, code] of [
+  ['FIELD_TRIP_DEPARTURE', 'WORKSHOP_CHECKIN_REQUIRED'],
+  ['FIELD_TRIP_RETURN', 'FIELD_TRIP_DEPARTURE_REQUIRED'],
+  ['DAY2_CHECK_OUT', 'DAY2_ATTENDANCE_REQUIRED'],
+]) test(`${mode} ${type} enforces committed prerequisites and preserves duplicate identity`, async () => {
+  const ref = await seedRegistration(); const issued = await tickets.issueForRegistrationRef(ref);
+  const identity = mode === 'QR' ? { ticketToken: issued.ticketPayload } : { registrationDocId: ref.id };
+  const selection = { type, ...(type === 'DAY2_CHECK_OUT' ? { accommodationGroup: 'ALL' } : {}) };
+  await checkins.checkIn({ registrationDocId: ref.id, type: 'EVENT' }, admin);
+  const before = await checkins.summary(selection, admin);
+  assert.deepEqual([before.expected, before.scanned, before.remainingCount, before.remaining.length], [0, 0, 0, 0]);
+  const recordsBefore = (await db.collection('checkins').get()).size;
+  await assert.rejects(checkins.checkIn({ ...identity, ...selection }, admin), { code });
+  assert.equal((await db.collection('checkins').get()).size, recordsBefore);
+  await checkins.checkIn({ registrationDocId: ref.id, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  if (type === 'FIELD_TRIP_RETURN') {
+    await assert.rejects(checkins.checkIn({ ...identity, ...selection }, admin), { code });
+    assert.equal((await checkins.summary(selection, admin)).expected, 0);
+    await checkins.checkIn({ registrationDocId: ref.id, type: 'FIELD_TRIP_DEPARTURE' }, admin);
+  }
+  const eligible = await checkins.summary(selection, admin);
+  assert.deepEqual([eligible.expected, eligible.scanned, eligible.remainingCount], [1, 0, 1]);
+  const success = await checkins.checkIn({ ...identity, ...selection }, admin);
+  const duplicate = await checkins.checkIn({ ...identity, ...selection }, admin);
+  assert.equal(success.outcome, 'CHECKED_IN'); assert.equal(duplicate.outcome, 'ALREADY_CHECKED_IN');
+  assert.equal(duplicate.checkedInAt, success.checkedInAt);
+  assert.equal((await db.collection('checkins').where('type', '==', type).get()).size, 1);
+  const after = await checkins.summary(selection, admin);
+  assert.deepEqual([after.expected, after.scanned, after.remainingCount], [1, 1, 0]); assert.deepEqual(after.remaining, []);
+});
+
+for (const evidence of [
+  ['WORKSHOP'], ['WORKSHOP', 'FIELD_TRIP_DEPARTURE'], ['WORKSHOP', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN'],
+  ['FIELD_TRIP_DEPARTURE'], ['FIELD_TRIP_RETURN'],
+]) test(`Day 2 checkout accepts and deduplicates ${evidence.join(' + ')} without rewriting evidence`, async () => {
+  const ref = await seedRegistration({ accommodation: { isHosteller: false, needsStay: true, stayType: 'NON_AC' } });
+  const issued = await tickets.issueForRegistrationRef(ref);
+  const historical = [];
+  for (const type of evidence) historical.push(await historicalAttendance(ref, type, type === 'WORKSHOP' ? 'github-ai' : null));
+  const selection = { type: 'DAY2_CHECK_OUT', accommodationGroup: 'STAY' };
+  assert.equal((await checkins.summary({ type: 'DAY2_CHECK_OUT', accommodationGroup: 'SANTHOME' }, admin)).expected, 0);
+  await assert.rejects(checkins.checkIn({ registrationDocId: ref.id, ...selection, accommodationGroup: 'SANTHOME' }, admin), { code: 'ACCOMMODATION_GROUP_MISMATCH' });
+  const before = await checkins.summary(selection, admin);
+  assert.deepEqual([before.expected, before.scanned, before.remainingCount], [1, 0, 1]);
+  assert.equal(before.remaining[0].phone, '9876543210'); assert.equal(before.remaining[0].accommodationGroup, 'STAY');
+  const result = await checkins.checkIn({ ticketToken: issued.ticketPayload, ...selection }, admin);
+  assert.equal(result.outcome, 'CHECKED_IN');
+  const after = await checkins.summary(selection, admin);
+  assert.deepEqual([after.expected, after.scanned, after.remainingCount], [1, 1, 0]); assert.deepEqual(after.remaining, []);
+  for (const old of historical) { const current = await old.ref.get(); assert.deepEqual(current.data(), old.data()); assert.ok(current.updateTime.isEqual(old.updateTime)); }
+  if (evidence.length === 1 && evidence[0] === 'WORKSHOP') {
+    assert.equal((await db.collection('checkins').where('type', '==', 'FIELD_TRIP_DEPARTURE').get()).size, 0);
+    // Early checkout does not revoke subsequent field-trip eligibility.
+    assert.equal((await checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'FIELD_TRIP_DEPARTURE' }, admin)).outcome, 'CHECKED_IN');
+  }
+});
+
+test('Day 2 summaries agree with canonical sets and use bounded queries independent of roster size', async () => {
+  const evidence = [['WORKSHOP'], ['WORKSHOP', 'FIELD_TRIP_DEPARTURE'], ['WORKSHOP', 'FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN'], [], ['FIELD_TRIP_RETURN']];
+  for (const [index, types] of evidence.entries()) {
+    const ref = await seedRegistration({ id: `population-${index}`, registrationId: `VYR26-${index}` });
+    await tickets.issueForRegistrationRef(ref);
+    for (const type of types) await historicalAttendance(ref, type, type === 'WORKSHOP' ? 'github-ai' : null);
+  }
+  // Duplicate-looking/noncanonical documents are neither prerequisite evidence nor extra people.
+  await db.doc('checkins/lookalike-workshop').set({ type: 'WORKSHOP', workshopId: 'github-ai', registrationDocId: 'population-3' });
+  await db.doc('checkins/lookalike-departure').set({ type: 'FIELD_TRIP_DEPARTURE', workshopId: null, registrationDocId: 'population-3' });
+  await db.doc('checkins/lookalike-return').set({ type: 'FIELD_TRIP_RETURN', workshopId: null, registrationDocId: 'population-3' });
+  let queries = 0;
+  const measured = createCheckinService({ db: { collection(name) {
+    const collection = db.collection(name);
+    return { get() { queries++; return collection.get(); }, where(...args) {
+      const query = collection.where(...args); return { get() { queries++; return query.get(); } };
+    } };
+  } }, ticketService: tickets });
+  for (const [selection, counts, pending, queryCount] of [
+    [{ type: 'FIELD_TRIP_DEPARTURE' }, [3, 2, 1], ['VYR26-0'], 3],
+    [{ type: 'FIELD_TRIP_RETURN' }, [2, 1, 1], ['VYR26-1'], 3],
+    [{ type: 'DAY2_CHECK_OUT', accommodationGroup: 'ALL' }, [4, 0, 4], ['VYR26-0', 'VYR26-1', 'VYR26-2', 'VYR26-4'], 5],
+  ]) {
+    queries = 0; const summary = await measured.summary(selection, admin);
+    assert.deepEqual([summary.expected, summary.scanned, summary.remainingCount], counts);
+    assert.deepEqual(summary.remaining.map((item) => item.registrationId).sort(), pending);
+    assert.equal(queries, queryCount);
+  }
+  await assert.rejects(checkins.checkIn({ registrationDocId: 'population-3', type: 'FIELD_TRIP_DEPARTURE' }, admin), { code: 'WORKSHOP_CHECKIN_REQUIRED' });
+  await assert.rejects(checkins.checkIn({ registrationDocId: 'population-3', type: 'FIELD_TRIP_RETURN' }, admin), { code: 'FIELD_TRIP_DEPARTURE_REQUIRED' });
+  await assert.rejects(checkins.checkIn({ registrationDocId: 'population-3', type: 'DAY2_CHECK_OUT', accommodationGroup: 'ALL' }, admin), { code: 'DAY2_ATTENDANCE_REQUIRED' });
+});
+
+for (const type of ['FIELD_TRIP_DEPARTURE', 'FIELD_TRIP_RETURN', 'DAY2_CHECK_OUT']) test(`10 QR/manual ${type} requests share one canonical write`, async () => {
+  const ref = await seedRegistration(); const issued = await tickets.issueForRegistrationRef(ref);
+  await checkins.checkIn({ registrationDocId: ref.id, type: 'WORKSHOP', workshopId: 'github-ai' }, admin);
+  if (type === 'FIELD_TRIP_RETURN') await checkins.checkIn({ registrationDocId: ref.id, type: 'FIELD_TRIP_DEPARTURE' }, admin);
+  const results = await Promise.all(Array.from({ length: 10 }, (_, index) => checkins.checkIn({
+    ...(index % 2 ? { registrationDocId: ref.id } : { ticketToken: issued.ticketPayload }), type,
+    ...(type === 'DAY2_CHECK_OUT' ? { accommodationGroup: 'ALL' } : {}),
+  }, { ...admin, uid: `day2-staff-${index}` })));
+  assert.equal(results.filter((item) => item.outcome === 'CHECKED_IN').length, 1);
+  assert.equal(results.filter((item) => item.outcome === 'ALREADY_CHECKED_IN').length, 9);
+  assert.equal((await db.collection('checkins').where('type', '==', type).get()).size, 1);
+});
+
+test('historical Day 1 records, identities and timestamps stay unchanged through Day 2 operations', async () => {
+  const ref = await seedRegistration(); const issued = await tickets.issueForRegistrationRef(ref);
+  const historical = [await historicalAttendance(ref, 'EVENT'), await historicalAttendance(ref, 'DAY1_CHECK_OUT')];
+  const registrationBefore = (await ref.get()).data(); const ticketBefore = (await db.doc(`tickets/${ref.id}`).get()).data();
+  for (const selection of [{ type: 'EVENT' }, { type: 'DAY1_CHECK_OUT', accommodationGroup: 'ALL' },
+    { type: 'WORKSHOP', workshopId: 'github-ai' }, { type: 'FIELD_TRIP_DEPARTURE' }, { type: 'FIELD_TRIP_RETURN' },
+    { type: 'DAY2_CHECK_OUT', accommodationGroup: 'ALL' }]) {
+    await checkins.checkIn({ ticketToken: issued.ticketPayload, ...selection }, admin);
+    const summary = await checkins.summary(selection, admin);
+    assert.deepEqual([summary.expected, summary.scanned, summary.remainingCount], [1, 1, 0]);
+  }
+  for (const old of historical) {
+    const current = await old.ref.get(); assert.deepEqual(current.data(), old.data());
+    assert.ok(current.createTime.isEqual(old.createTime)); assert.ok(current.updateTime.isEqual(old.updateTime));
+  }
+  assert.deepEqual((await ref.get()).data(), registrationBefore);
+  assert.deepEqual((await db.doc(`tickets/${ref.id}`).get()).data(), ticketBefore);
+  assert.equal((await db.collection('checkins').get()).size, 6);
+});
+
+test('preexisting canonical departure duplicate remains safe without retroactive prerequisite backfill', async () => {
+  const ref = await seedRegistration(); const issued = await tickets.issueForRegistrationRef(ref);
+  const old = await historicalAttendance(ref, 'FIELD_TRIP_DEPARTURE');
+  const duplicate = await checkins.checkIn({ ticketToken: issued.ticketPayload, type: 'FIELD_TRIP_DEPARTURE' }, admin);
+  assert.equal(duplicate.outcome, 'ALREADY_CHECKED_IN');
+  assert.deepEqual((await old.ref.get()).data(), old.data());
+  assert.equal((await db.collection('checkins').get()).size, 1);
 });
